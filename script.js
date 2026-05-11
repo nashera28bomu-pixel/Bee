@@ -3,6 +3,7 @@ const cors = require('cors');
 const https = require('https');
 const path = require('path');
 const fs = require('fs');
+const os = require('os'); // Added for temporary directory access
 
 const YTDlpWrap = require('yt-dlp-wrap').default;
 
@@ -26,18 +27,14 @@ const ytDlp = new YTDlpWrap(ytDlpPath);
  * Auto install yt-dlp
  */
 async function setupYtDlp() {
-
     if (fs.existsSync(ytDlpPath)) {
         console.log('✅ yt-dlp already exists');
         return;
     }
 
     console.log('⬇️ Downloading yt-dlp...');
-
     await YTDlpWrap.downloadFromGithub(ytDlpPath);
-
     fs.chmodSync(ytDlpPath, 0o755);
-
     console.log('✅ yt-dlp installed');
 }
 
@@ -80,11 +77,10 @@ app.get('/test-ytdlp', async (req, res) => {
 
 /**
  * =========================
- * 🔥 FIXED DOWNLOAD ROUTE (REAL FILE DOWNLOAD)
+ * 🔥 FIXED DOWNLOAD ROUTE
  * =========================
  */
 app.get('/download', async (req, res) => {
-
     const videoUrl = req.query.url;
     const formatType = req.query.format || 'mp4';
 
@@ -95,28 +91,24 @@ app.get('/download', async (req, res) => {
     const platform = detectPlatform(videoUrl);
 
     try {
-
         console.log('🚀 SERVER DOWNLOAD MODE ACTIVE');
-        console.log('📥 URL:', videoUrl);
-        console.log('📱 PLATFORM:', platform);
+        
+        // FIX: Use /tmp directory for Render/Docker compatibility
+        const fileName = `Cymor_${Date.now()}.mp4`;
+        const filePath = path.join(os.tmpdir(), fileName);
 
-        const fileName = `video_${Date.now()}.mp4`;
-        const filePath = path.join(__dirname, fileName);
-
-        let format = 'best';
-
-        if (formatType === 'mp3') {
-            format = 'bestaudio/best';
-        }
+        // TikTok and YouTube require specific formats to avoid 0kb files
+        // bestvideo+bestaudio/best ensures we get both streams merged
+        let format = formatType === 'mp3' ? 'bestaudio/best' : 'bestvideo+bestaudio/best';
 
         const args = [
             videoUrl,
             '--output', filePath,
+            '--format', format,
+            '--merge-output-format', 'mp4',
             '--no-warnings',
-            '--force-ipv4',
-            '--geo-bypass',
-            '--retries', '3',
-            '--format', format
+            '--no-check-certificate',
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
         ];
 
         if (platform === 'TikTok') {
@@ -126,14 +118,16 @@ app.get('/download', async (req, res) => {
         await ytDlp.execPromise(args);
 
         /**
-         * 🔥 VALIDATE FILE (CRITICAL FIX)
+         * 🔥 VALIDATE FILE
          */
-        const stats = fs.existsSync(filePath)
-            ? fs.statSync(filePath)
-            : null;
+        if (!fs.existsSync(filePath)) {
+            throw new Error('Download failed: File not created');
+        }
 
-        if (!stats || stats.size < 10000) {
-            throw new Error('Invalid or blocked download (file too small)');
+        const stats = fs.statSync(filePath);
+        if (stats.size < 2000) { // If less than 2KB, it's likely an error message/block
+            fs.unlinkSync(filePath);
+            throw new Error('File too small. The platform might be blocking the request.');
         }
 
         return res.json({
@@ -145,9 +139,7 @@ app.get('/download', async (req, res) => {
         });
 
     } catch (error) {
-
         console.error('❌ DOWNLOAD FAILED:', error.message);
-
         return res.status(500).json({
             success: false,
             error: 'Download failed',
@@ -158,52 +150,28 @@ app.get('/download', async (req, res) => {
 
 /**
  * =========================
- * 🔥 STREAM FILE ROUTE (FIXED)
+ * 🔥 STREAM FILE ROUTE
  * =========================
  */
 app.get('/stream-file', (req, res) => {
-
     const file = req.query.file;
-
     if (!file) return res.status(400).send('No file');
 
-    const filePath = path.join(__dirname, file);
+    // FIX: Match the /tmp directory path used in /download
+    const filePath = path.join(os.tmpdir(), file);
 
     if (!fs.existsSync(filePath)) {
-        return res.status(404).send('File not found');
+        return res.status(404).send('File not found or expired');
     }
 
-    res.download(filePath, (err) => {
-
-        // cleanup after download
-        fs.unlink(filePath, () => {});
-    });
-});
-
-/**
- * Stream external fallback (optional)
- */
-app.get('/stream', (req, res) => {
-
-    const url = req.query.url;
-
-    if (!url) return res.status(400).send('No URL');
-
-    const filename = `Cymor_${Date.now()}.mp4`;
-
-    https.get(url, stream => {
-
-        res.setHeader(
-            'Content-Disposition',
-            `attachment; filename="${filename}"`
-        );
-
-        res.setHeader('Content-Type', 'video/mp4');
-
-        stream.pipe(res);
-
-    }).on('error', error => {
-        res.status(500).send('Stream failed: ' + error.message);
+    res.download(filePath, file, (err) => {
+        if (err) {
+            console.error("Stream error:", err);
+        }
+        // Cleanup file after download is sent to user
+        fs.unlink(filePath, (unlinkErr) => {
+            if (unlinkErr) console.error("Cleanup error:", unlinkErr);
+        });
     });
 });
 
