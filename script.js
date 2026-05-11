@@ -6,14 +6,18 @@ const path = require('path');
 
 const app = express();
 
+/**
+ * Middleware
+ */
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
 
 /**
- * Render yt-dlp binary path
+ * IMPORTANT:
+ * Use global yt-dlp binary installed by pip
  */
-const ytDlp = createYtDlp('/opt/render/project/.local/bin/yt-dlp');
+const ytDlp = createYtDlp('yt-dlp');
 
 /**
  * Detect platform
@@ -34,24 +38,53 @@ app.get('/', (req, res) => {
 });
 
 /**
- * Health check route
+ * Health check
  */
 app.get('/health', (req, res) => {
     res.json({
+        success: true,
         status: 'online',
         app: 'CymorAllVideoDownloader'
     });
 });
 
 /**
- * Download API
+ * yt-dlp test route
+ */
+app.get('/test-ytdlp', async (req, res) => {
+
+    try {
+
+        const version = await ytDlp('--version');
+
+        res.json({
+            success: true,
+            yt_dlp_version: version.toString().trim()
+        });
+
+    } catch (error) {
+
+        console.error('❌ yt-dlp test failed');
+        console.error(error);
+
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Download route
  */
 app.get('/download', async (req, res) => {
+
     const videoUrl = req.query.url;
     const formatType = req.query.format || 'mp4';
 
     if (!videoUrl) {
         return res.status(400).json({
+            success: false,
             error: 'No URL provided'
         });
     }
@@ -59,10 +92,12 @@ app.get('/download', async (req, res) => {
     const platform = detectPlatform(videoUrl);
 
     try {
-        console.log('--------------------------------');
-        console.log('📥 Processing URL:', videoUrl);
-        console.log('🎬 Format:', formatType);
-        console.log('--------------------------------');
+
+        console.log('================================');
+        console.log('📥 NEW DOWNLOAD REQUEST');
+        console.log('🔗 URL:', videoUrl);
+        console.log('🎬 FORMAT:', formatType);
+        console.log('================================');
 
         const options = {
             dumpSingleJson: true,
@@ -77,77 +112,85 @@ app.get('/download', async (req, res) => {
         };
 
         /**
-         * Video / Audio format logic
+         * Format selection
          */
         if (formatType === 'mp3') {
+
             options.format = 'bestaudio/best';
+
         } else {
+
             options.format =
                 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
         }
 
         /**
-         * Extract video information
+         * Run yt-dlp
          */
         const output = await ytDlp(videoUrl, options);
 
         if (!output) {
-            throw new Error('No data returned from yt-dlp');
+            throw new Error('yt-dlp returned empty response');
         }
 
         /**
-         * Get best downloadable URL
+         * Get direct downloadable URL
          */
         let downloadUrl = output.url;
 
+        /**
+         * Fallback search
+         */
         if (!downloadUrl && output.formats?.length) {
-            const formats = output.formats.filter(
-                f => f.url && f.vcodec !== 'none'
+
+            const validFormats = output.formats.filter(format =>
+                format.url &&
+                format.vcodec !== 'none'
             );
 
-            const bestFormat = formats.sort((a, b) => {
+            validFormats.sort((a, b) => {
                 return (b.height || 0) - (a.height || 0);
-            })[0];
+            });
 
-            if (bestFormat) {
-                downloadUrl = bestFormat.url;
+            if (validFormats.length > 0) {
+                downloadUrl = validFormats[0].url;
             }
         }
 
         if (!downloadUrl) {
-            throw new Error('Failed to extract downloadable media');
+            throw new Error('No downloadable media URL found');
         }
 
         /**
          * Success response
          */
-        res.json({
+        return res.json({
             success: true,
             app: 'CymorAllVideoDownloader',
-            platform,
+            platform: platform,
             title: output.title || 'Cymor_Video',
             thumbnail: output.thumbnail || '',
             duration: output.duration || 0,
             uploader: output.uploader || 'Unknown',
+            webpage_url: output.webpage_url || '',
             download_link: downloadUrl
         });
 
     } catch (error) {
 
-        console.error('❌ CYMOR BACKEND ERROR');
+        console.error('❌ DOWNLOAD ERROR');
         console.error(error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Extraction failed',
-            details: error.message || 'Unknown server error'
+            details: error.message || 'Unknown error'
         });
     }
 });
 
 /**
- * Stream Proxy
- * Forces browser download
+ * Stream route
  */
 app.get('/stream', async (req, res) => {
 
@@ -168,22 +211,27 @@ app.get('/stream', async (req, res) => {
                 `attachment; filename="${filename}"`
             );
 
-            res.setHeader('Content-Type', 'video/mp4');
+            res.setHeader(
+                'Content-Type',
+                'video/mp4'
+            );
 
             stream.pipe(res);
 
-        }).on('error', err => {
+        }).on('error', error => {
 
-            console.error('❌ Stream Error:', err);
+            console.error('❌ STREAM ERROR');
+            console.error(error);
 
             res.status(500).send(
-                'Stream failed: ' + err.message
+                'Stream failed: ' + error.message
             );
         });
 
     } catch (error) {
 
-        console.error('❌ Proxy Error:', error);
+        console.error('❌ PROXY ERROR');
+        console.error(error);
 
         res.status(500).send(
             'Proxy failed'
@@ -195,7 +243,9 @@ app.get('/stream', async (req, res) => {
  * 404 handler
  */
 app.use((req, res) => {
+
     res.status(404).json({
+        success: false,
         error: 'Route not found'
     });
 });
