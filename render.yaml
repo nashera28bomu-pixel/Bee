@@ -3,13 +3,13 @@ services:
     name: cymorallvideodownloader
     env: node
     plan: free
-    buildCommand: npm install
+
+    buildCommand: |
+      npm install
+      pip install yt-dlp
+
     startCommand: npm start
+
     envVars:
       - key: NODE_VERSION
-        value: 20.0.0
-      - key: PYTHON_VERSION
-        value: 3.10.0
-    buildpacks:
-      - github.com/render-examples/heroku-buildpack-ffmpeg-latest
-      - render/node
+        value: 20
