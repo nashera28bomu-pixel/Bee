@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: cymorallvideodownloader
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.0.0
+      - key: PYTHON_VERSION
+        value: 3.10.0
+    buildpacks:
+      - github.com/render-examples/heroku-buildpack-ffmpeg-latest
+      - render/node
