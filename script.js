@@ -47,17 +47,8 @@ async function setupYtDlp() {
 function detectPlatform(url) {
 
     if (url.includes('tiktok.com')) return 'TikTok';
-
-    if (
-        url.includes('facebook.com') ||
-        url.includes('fb.watch')
-    ) return 'Facebook';
-
-    if (
-        url.includes('youtube.com') ||
-        url.includes('youtu.be')
-    ) return 'YouTube';
-
+    if (url.includes('facebook.com') || url.includes('fb.watch')) return 'Facebook';
+    if (url.includes('youtube.com') || url.includes('youtu.be')) return 'YouTube';
     if (url.includes('instagram.com')) return 'Instagram';
 
     return 'Unknown';
@@ -74,10 +65,7 @@ app.get('/', (req, res) => {
  * Health route
  */
 app.get('/health', (req, res) => {
-    res.json({
-        success: true,
-        status: 'online'
-    });
+    res.json({ success: true, status: 'online' });
 });
 
 /**
@@ -87,9 +75,7 @@ app.get('/test-ytdlp', async (req, res) => {
 
     try {
 
-        const version = await ytDlp.execPromise([
-            '--version'
-        ]);
+        const version = await ytDlp.execPromise(['--version']);
 
         res.json({
             success: true,
@@ -106,7 +92,9 @@ app.get('/test-ytdlp', async (req, res) => {
 });
 
 /**
- * Download route
+ * =========================
+ * ULTRA STABLE DOWNLOAD ROUTE
+ * =========================
  */
 app.get('/download', async (req, res) => {
 
@@ -120,77 +108,114 @@ app.get('/download', async (req, res) => {
         });
     }
 
-    try {
+    const platform = detectPlatform(videoUrl);
 
-        const platform = detectPlatform(videoUrl);
+    console.log('================================');
+    console.log('🚀 ULTRA STABLE MODE ACTIVE');
+    console.log('📥 URL:', videoUrl);
+    console.log('📱 PLATFORM:', platform);
+    console.log('================================');
 
-        console.log('📥 Download request:', videoUrl);
+    /**
+     * FORMAT LADDER (fix instability)
+     */
+    const formatLadder = [
+        'bestvideo+bestaudio/best',
+        'best[ext=mp4]/best',
+        'best'
+    ];
 
-        /**
-         * TikTok FIX (important)
-         */
-        let format = 'bestvideo+bestaudio/best';
+    if (formatType === 'mp3') {
+        formatLadder.unshift('bestaudio/best');
+    }
 
-        const options = [
+    /**
+     * extraction function
+     */
+    const tryExtract = async (format) => {
+
+        const args = [
             videoUrl,
             '--dump-single-json',
             '--no-warnings',
             '--no-check-certificates',
             '--prefer-free-formats',
-            '--geo-bypass'
+            '--force-ipv4',
+            '--geo-bypass',
+            '--retries', '2',
+            '--fragment-retries', '2',
+            '--socket-timeout', '15',
+            '--user-agent',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36',
+            '--format', format
         ];
 
         if (platform === 'TikTok') {
-            format = 'best';
-            options.push('--referer', 'https://www.tiktok.com/');
+            args.push('--referer', 'https://www.tiktok.com/');
         }
 
-        if (formatType === 'mp3') {
-            format = 'bestaudio/best';
-        }
+        const result = await ytDlp.execPromise(args);
+        return JSON.parse(result);
+    };
 
-        options.push('--format', format);
+    try {
 
-        const result = await ytDlp.execPromise(options);
+        let output = null;
 
-        const output = JSON.parse(result);
+        // TRY MULTIPLE FORMATS (stability layer)
+        for (const format of formatLadder) {
 
-        /**
-         * =========================
-         * FIXED DOWNLOAD LOGIC
-         * =========================
-         */
+            try {
+                output = await tryExtract(format);
 
-        let downloadUrl = null;
+                if (output && output.formats?.length) {
+                    break;
+                }
 
-        // PRIORITY: pick best real video format
-        if (output.formats && output.formats.length > 0) {
-
-            const validFormats = output.formats
-                .filter(f =>
-                    f.url &&
-                    f.vcodec !== 'none' &&
-                    !f.url.includes('manifest')
-                )
-                .sort((a, b) => (b.height || 0) - (a.height || 0));
-
-            if (validFormats.length > 0) {
-                downloadUrl = validFormats[0].url;
+            } catch (e) {
+                console.log('⚠️ format failed:', format);
             }
         }
 
-        // fallback only if needed
+        if (!output || !output.formats) {
+            throw new Error('Extraction failed from all formats');
+        }
+
+        /**
+         * =========================
+         * SAFE DOWNLOAD SELECTION
+         * =========================
+         */
+        let downloadUrl = null;
+
+        const validFormats = output.formats
+            .filter(f =>
+                f.url &&
+                f.vcodec !== 'none' &&
+                !f.url.includes('manifest') &&
+                !f.url.includes('html')
+            )
+            .sort((a, b) => (b.height || 0) - (a.height || 0));
+
+        if (validFormats.length > 0) {
+            downloadUrl = validFormats[0].url;
+        }
+
         if (!downloadUrl) {
             downloadUrl = output.url;
         }
 
-        if (!downloadUrl) {
-            throw new Error('No downloadable URL found');
+        /**
+         * FINAL VALIDATION (prevents 0KB files)
+         */
+        if (!downloadUrl || downloadUrl.includes('<html')) {
+            throw new Error('Blocked or invalid media URL detected');
         }
 
-        res.json({
+        return res.json({
             success: true,
             app: 'CymorAllVideoDownloader',
+            mode: 'ULTRA_STABLE',
             platform,
             title: output.title || 'Cymor_Video',
             thumbnail: output.thumbnail || '',
@@ -201,12 +226,11 @@ app.get('/download', async (req, res) => {
 
     } catch (error) {
 
-        console.error('❌ DOWNLOAD ERROR');
-        console.error(error);
+        console.error('❌ ULTRA STABLE FAILED:', error.message);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            error: 'Extraction failed',
+            error: 'Extraction failed (Ultra Stable Mode)',
             details: error.message
         });
     }
@@ -223,37 +247,23 @@ app.get('/stream', (req, res) => {
         return res.status(400).send('No URL');
     }
 
-    try {
+    const filename = `Cymor_${Date.now()}.mp4`;
 
-        const filename = `Cymor_${Date.now()}.mp4`;
+    https.get(url, stream => {
 
-        https.get(url, stream => {
-
-            res.setHeader(
-                'Content-Disposition',
-                `attachment; filename="${filename}"`
-            );
-
-            res.setHeader(
-                'Content-Type',
-                'video/mp4'
-            );
-
-            stream.pipe(res);
-
-        }).on('error', error => {
-
-            res.status(500).send(
-                'Stream failed: ' + error.message
-            );
-        });
-
-    } catch (error) {
-
-        res.status(500).send(
-            'Proxy failed'
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="${filename}"`
         );
-    }
+
+        res.setHeader('Content-Type', 'video/mp4');
+
+        stream.pipe(res);
+
+    }).on('error', error => {
+
+        res.status(500).send('Stream failed: ' + error.message);
+    });
 });
 
 /**
@@ -263,13 +273,11 @@ const PORT = process.env.PORT || 3000;
 
 setupYtDlp()
     .then(() => {
-
         app.listen(PORT, () => {
             console.log('🚀 Server running on port', PORT);
         });
     })
     .catch(error => {
-
         console.error('❌ yt-dlp setup failed');
         console.error(error);
     });
