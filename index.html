@@ -86,10 +86,12 @@
             </div>
 
             <div id="result" class="hidden mt-8 bg-black/50 p-4 rounded-2xl border border-white/5">
-                <img id="resThumb" src="" class="w-full aspect-video object-cover rounded-lg mb-4 shadow-lg">
+                <div class="w-full aspect-video flex items-center justify-center bg-[#222] rounded-lg mb-4">
+                    <i class="fas fa-video text-4xl text-purple-500"></i>
+                </div>
                 <h4 id="resTitle" class="font-bold text-sm line-clamp-2 mb-1"></h4>
                 <p id="resPlatform" class="text-[10px] uppercase tracking-widest text-purple-500 font-black"></p>
-                <a id="resLink" href="#" target="_blank" class="block w-full mt-4 bg-green-500 text-black text-center py-3 rounded-xl font-black uppercase text-sm">
+                <a id="resLink" href="#" class="block w-full mt-4 bg-green-500 text-black text-center py-3 rounded-xl font-black uppercase text-sm">
                     Ready to Download
                 </a>
             </div>
@@ -113,23 +115,26 @@
     </section>
 
     <script>
-        const API_BASE = "https://cymorallvideodownloader.onrender.com";
+        // Use relative path or update this to your exact render URL
+        const API_BASE = window.location.origin; 
         let fmt = 'mp4';
 
         function navTo(page) {
+            const p1 = document.getElementById('page1');
+            const p2 = document.getElementById('page2');
             if(page === 2) {
-                document.getElementById('page1').classList.add('hidden-page');
+                p1.classList.add('hidden-page');
                 setTimeout(() => {
-                    document.getElementById('page1').style.display = 'none';
-                    document.getElementById('page2').style.display = 'flex';
-                    setTimeout(() => document.getElementById('page2').classList.remove('hidden-page'), 50);
+                    p1.style.display = 'none';
+                    p2.style.display = 'flex';
+                    setTimeout(() => p2.classList.remove('hidden-page'), 50);
                 }, 500);
             } else {
-                document.getElementById('page2').classList.add('hidden-page');
+                p2.classList.add('hidden-page');
                 setTimeout(() => {
-                    document.getElementById('page2').style.display = 'none';
-                    document.getElementById('page1').style.display = 'flex';
-                    setTimeout(() => document.getElementById('page1').classList.remove('hidden-page'), 50);
+                    p2.style.display = 'none';
+                    p1.style.display = 'flex';
+                    setTimeout(() => p1.classList.remove('hidden-page'), 50);
                 }, 500);
             }
         }
@@ -141,7 +146,8 @@
         }
 
         async function fetchMedia() {
-            const url = document.getElementById('videoUrl').value;
+            const urlInput = document.getElementById('videoUrl');
+            const url = urlInput.value.trim();
             if(!url) return;
 
             // Reset UI
@@ -150,24 +156,24 @@
             document.getElementById('dlBtn').disabled = true;
 
             try {
+                // Calling the fixed /download route
                 const res = await fetch(`${API_BASE}/download?url=${encodeURIComponent(url)}&format=${fmt}`);
                 const data = await res.json();
 
-                if(data.error) throw new Error(data.error);
+                if(!data.success) throw new Error(data.error || "Download failed");
 
-                // Update Result
-                document.getElementById('resThumb').src = data.thumbnail;
+                // Update Result UI
                 document.getElementById('resTitle').innerText = data.title;
                 document.getElementById('resPlatform').innerText = data.platform;
                 
-                // Using the /stream route to ensure download starts
-                const dlUrl = `${API_BASE}/stream?url=${encodeURIComponent(data.download_link)}`;
-                document.getElementById('resLink').href = dlUrl;
+                // CRITICAL FIX: Use the download_url provided by the server (/stream-file?file=...)
+                document.getElementById('resLink').href = `${API_BASE}${data.download_url}`;
 
                 document.getElementById('result').classList.remove('hidden');
                 addToRecent(data.title, data.platform);
             } catch (e) {
-                alert("Error fetching media. Please check link.");
+                console.error(e);
+                alert("Error: " + e.message);
             } finally {
                 document.getElementById('loader').classList.add('hidden');
                 document.getElementById('dlBtn').disabled = false;
