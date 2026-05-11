@@ -74,7 +74,6 @@ app.get('/', (req, res) => {
  * Health route
  */
 app.get('/health', (req, res) => {
-
     res.json({
         success: true,
         status: 'online'
@@ -98,8 +97,6 @@ app.get('/test-ytdlp', async (req, res) => {
         });
 
     } catch (error) {
-
-        console.error(error);
 
         res.status(500).json({
             success: false,
@@ -129,41 +126,62 @@ app.get('/download', async (req, res) => {
 
         console.log('📥 Download request:', videoUrl);
 
-        let format =
-            'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best';
+        /**
+         * TikTok FIX (important)
+         */
+        let format = 'bestvideo+bestaudio/best';
 
-        if (formatType === 'mp3') {
-            format = 'bestaudio/best';
-        }
-
-        const result = await ytDlp.execPromise([
+        const options = [
             videoUrl,
             '--dump-single-json',
             '--no-warnings',
             '--no-check-certificates',
             '--prefer-free-formats',
-            '--geo-bypass',
-            '--format',
-            format
-        ]);
+            '--geo-bypass'
+        ];
+
+        if (platform === 'TikTok') {
+            format = 'best';
+            options.push('--referer', 'https://www.tiktok.com/');
+        }
+
+        if (formatType === 'mp3') {
+            format = 'bestaudio/best';
+        }
+
+        options.push('--format', format);
+
+        const result = await ytDlp.execPromise(options);
 
         const output = JSON.parse(result);
 
-        let downloadUrl = output.url;
+        /**
+         * =========================
+         * FIXED DOWNLOAD LOGIC
+         * =========================
+         */
 
-        if (!downloadUrl && output.formats) {
+        let downloadUrl = null;
 
-            const validFormats = output.formats.filter(
-                f => f.url && f.vcodec !== 'none'
-            );
+        // PRIORITY: pick best real video format
+        if (output.formats && output.formats.length > 0) {
 
-            validFormats.sort((a, b) =>
-                (b.height || 0) - (a.height || 0)
-            );
+            const validFormats = output.formats
+                .filter(f =>
+                    f.url &&
+                    f.vcodec !== 'none' &&
+                    !f.url.includes('manifest')
+                )
+                .sort((a, b) => (b.height || 0) - (a.height || 0));
 
             if (validFormats.length > 0) {
                 downloadUrl = validFormats[0].url;
             }
+        }
+
+        // fallback only if needed
+        if (!downloadUrl) {
+            downloadUrl = output.url;
         }
 
         if (!downloadUrl) {
@@ -207,8 +225,7 @@ app.get('/stream', (req, res) => {
 
     try {
 
-        const filename =
-            `Cymor_${Date.now()}.mp4`;
+        const filename = `Cymor_${Date.now()}.mp4`;
 
         https.get(url, stream => {
 
@@ -248,7 +265,6 @@ setupYtDlp()
     .then(() => {
 
         app.listen(PORT, () => {
-
             console.log('🚀 Server running on port', PORT);
         });
     })
