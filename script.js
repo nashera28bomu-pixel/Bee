@@ -1,32 +1,65 @@
 const express = require('express');
 const cors = require('cors');
-const { create: createYtDlp } = require('yt-dlp-exec');
 const https = require('https');
 const path = require('path');
+const fs = require('fs');
+
+const YTDlpWrap = require('yt-dlp-wrap').default;
 
 const app = express();
 
-/**
- * Middleware
- */
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
 
 /**
- * IMPORTANT:
- * Use global yt-dlp binary installed by pip
+ * yt-dlp binary path
  */
-const ytDlp = createYtDlp('yt-dlp');
+const ytDlpPath = path.join(__dirname, 'yt-dlp');
+
+/**
+ * yt-dlp wrapper
+ */
+const ytDlp = new YTDlpWrap(ytDlpPath);
+
+/**
+ * Download yt-dlp automatically
+ */
+async function setupYtDlp() {
+
+    if (fs.existsSync(ytDlpPath)) {
+        console.log('✅ yt-dlp already exists');
+        return;
+    }
+
+    console.log('⬇️ Downloading yt-dlp binary...');
+
+    await YTDlpWrap.downloadFromGithub(ytDlpPath);
+
+    fs.chmodSync(ytDlpPath, 0o755);
+
+    console.log('✅ yt-dlp installed successfully');
+}
 
 /**
  * Detect platform
  */
 function detectPlatform(url) {
+
     if (url.includes('tiktok.com')) return 'TikTok';
-    if (url.includes('facebook.com') || url.includes('fb.watch')) return 'Facebook';
-    if (url.includes('youtube.com') || url.includes('youtu.be')) return 'YouTube';
+
+    if (
+        url.includes('facebook.com') ||
+        url.includes('fb.watch')
+    ) return 'Facebook';
+
+    if (
+        url.includes('youtube.com') ||
+        url.includes('youtu.be')
+    ) return 'YouTube';
+
     if (url.includes('instagram.com')) return 'Instagram';
+
     return 'Unknown';
 }
 
@@ -38,33 +71,34 @@ app.get('/', (req, res) => {
 });
 
 /**
- * Health check
+ * Health route
  */
 app.get('/health', (req, res) => {
+
     res.json({
         success: true,
-        status: 'online',
-        app: 'CymorAllVideoDownloader'
+        status: 'online'
     });
 });
 
 /**
- * yt-dlp test route
+ * Test yt-dlp
  */
 app.get('/test-ytdlp', async (req, res) => {
 
     try {
 
-        const version = await ytDlp('--version');
+        const version = await ytDlp.execPromise([
+            '--version'
+        ]);
 
         res.json({
             success: true,
-            yt_dlp_version: version.toString().trim()
+            version: version.trim()
         });
 
     } catch (error) {
 
-        console.error('❌ yt-dlp test failed');
         console.error(error);
 
         res.status(500).json({
@@ -89,68 +123,43 @@ app.get('/download', async (req, res) => {
         });
     }
 
-    const platform = detectPlatform(videoUrl);
-
     try {
 
-        console.log('================================');
-        console.log('📥 NEW DOWNLOAD REQUEST');
-        console.log('🔗 URL:', videoUrl);
-        console.log('🎬 FORMAT:', formatType);
-        console.log('================================');
+        const platform = detectPlatform(videoUrl);
 
-        const options = {
-            dumpSingleJson: true,
-            noCheckCertificates: true,
-            noWarnings: true,
-            preferFreeFormats: true,
-            geoBypass: true,
-            addHeader: [
-                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept-Language: en-US,en;q=0.9'
-            ]
-        };
+        console.log('📥 Download request:', videoUrl);
 
-        /**
-         * Format selection
-         */
+        let format =
+            'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best';
+
         if (formatType === 'mp3') {
-
-            options.format = 'bestaudio/best';
-
-        } else {
-
-            options.format =
-                'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+            format = 'bestaudio/best';
         }
 
-        /**
-         * Run yt-dlp
-         */
-        const output = await ytDlp(videoUrl, options);
+        const result = await ytDlp.execPromise([
+            videoUrl,
+            '--dump-single-json',
+            '--no-warnings',
+            '--no-check-certificates',
+            '--prefer-free-formats',
+            '--geo-bypass',
+            '--format',
+            format
+        ]);
 
-        if (!output) {
-            throw new Error('yt-dlp returned empty response');
-        }
+        const output = JSON.parse(result);
 
-        /**
-         * Get direct downloadable URL
-         */
         let downloadUrl = output.url;
 
-        /**
-         * Fallback search
-         */
-        if (!downloadUrl && output.formats?.length) {
+        if (!downloadUrl && output.formats) {
 
-            const validFormats = output.formats.filter(format =>
-                format.url &&
-                format.vcodec !== 'none'
+            const validFormats = output.formats.filter(
+                f => f.url && f.vcodec !== 'none'
             );
 
-            validFormats.sort((a, b) => {
-                return (b.height || 0) - (a.height || 0);
-            });
+            validFormats.sort((a, b) =>
+                (b.height || 0) - (a.height || 0)
+            );
 
             if (validFormats.length > 0) {
                 downloadUrl = validFormats[0].url;
@@ -158,21 +167,17 @@ app.get('/download', async (req, res) => {
         }
 
         if (!downloadUrl) {
-            throw new Error('No downloadable media URL found');
+            throw new Error('No downloadable URL found');
         }
 
-        /**
-         * Success response
-         */
-        return res.json({
+        res.json({
             success: true,
             app: 'CymorAllVideoDownloader',
-            platform: platform,
+            platform,
             title: output.title || 'Cymor_Video',
             thumbnail: output.thumbnail || '',
             duration: output.duration || 0,
             uploader: output.uploader || 'Unknown',
-            webpage_url: output.webpage_url || '',
             download_link: downloadUrl
         });
 
@@ -181,10 +186,10 @@ app.get('/download', async (req, res) => {
         console.error('❌ DOWNLOAD ERROR');
         console.error(error);
 
-        return res.status(500).json({
+        res.status(500).json({
             success: false,
             error: 'Extraction failed',
-            details: error.message || 'Unknown error'
+            details: error.message
         });
     }
 });
@@ -192,17 +197,18 @@ app.get('/download', async (req, res) => {
 /**
  * Stream route
  */
-app.get('/stream', async (req, res) => {
+app.get('/stream', (req, res) => {
 
     const url = req.query.url;
 
     if (!url) {
-        return res.status(400).send('No URL provided');
+        return res.status(400).send('No URL');
     }
 
     try {
 
-        const filename = `Cymor_${Date.now()}.mp4`;
+        const filename =
+            `Cymor_${Date.now()}.mp4`;
 
         https.get(url, stream => {
 
@@ -220,18 +226,12 @@ app.get('/stream', async (req, res) => {
 
         }).on('error', error => {
 
-            console.error('❌ STREAM ERROR');
-            console.error(error);
-
             res.status(500).send(
                 'Stream failed: ' + error.message
             );
         });
 
     } catch (error) {
-
-        console.error('❌ PROXY ERROR');
-        console.error(error);
 
         res.status(500).send(
             'Proxy failed'
@@ -240,25 +240,20 @@ app.get('/stream', async (req, res) => {
 });
 
 /**
- * 404 handler
- */
-app.use((req, res) => {
-
-    res.status(404).json({
-        success: false,
-        error: 'Route not found'
-    });
-});
-
-/**
  * Start server
  */
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+setupYtDlp()
+    .then(() => {
 
-    console.log('====================================');
-    console.log('🚀 CYMOR ALL VIDEO DOWNLOADER LIVE');
-    console.log(`🌍 PORT: ${PORT}`);
-    console.log('====================================');
-});
+        app.listen(PORT, () => {
+
+            console.log('🚀 Server running on port', PORT);
+        });
+    })
+    .catch(error => {
+
+        console.error('❌ yt-dlp setup failed');
+        console.error(error);
+    });
