@@ -6,7 +6,7 @@ services:
 
     buildCommand: |
       npm install
-      python3 -m pip install yt-dlp
+      pip install yt-dlp
 
     startCommand: npm start
 
