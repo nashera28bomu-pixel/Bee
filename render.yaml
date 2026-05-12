@@ -1,6 +1,7 @@
 services:
   - type: web
     name: cymorallvideodownloader
-    env: docker # Highly recommended over 'node' to ensure FFmpeg is there
+    env: node
     plan: free
-    numInstances: 1
+    buildCommand: "apt-get update && apt-get install -y ffmpeg python3 && npm install"
+    startCommand: "npm start"
