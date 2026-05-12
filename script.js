@@ -30,8 +30,8 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/health', (req, res) => res.json({ success: true, status: 'online' }));
 
 /**
- * 🔥 STABLE DOWNLOAD ROUTE
- * No longer depends on GitHub binary downloads
+ * 🔥 UPDATED STABLE DOWNLOAD ROUTE
+ * Fixed to handle MP3 extraction correctly
  */
 app.get('/download', async (req, res) => {
     const videoUrl = req.query.url;
@@ -42,23 +42,35 @@ app.get('/download', async (req, res) => {
     const platform = detectPlatform(videoUrl);
 
     try {
-        console.log(`🚀 Cymor Engine: Starting ${platform} extraction...`);
+        console.log(`🚀 Cymor Engine: Starting ${platform} ${formatType} extraction...`);
         
-        const fileName = `Cymor_${Date.now()}.mp4`;
+        // Use the correct extension based on formatType
+        const extension = formatType === 'mp3' ? 'mp3' : 'mp4';
+        const fileName = `Cymor_${Date.now()}.${extension}`;
         const filePath = path.join(os.tmpdir(), fileName);
 
-        // Run extraction using system-installed yt-dlp
-        await ytdlp(videoUrl, {
+        // Build options dynamically
+        const options = {
             output: filePath,
-            format: formatType === 'mp3' ? 'bestaudio/best' : 'bestvideo+bestaudio/best',
-            mergeOutputFormat: 'mp4',
             noPlaylist: true,
             noWarnings: true,
             noCheckCertificates: true,
             maxFilesize: '50M',
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             referer: platform === 'TikTok' ? 'https://www.tiktok.com/' : undefined
-        });
+        };
+
+        // Apply MP3 logic vs MP4 logic
+        if (formatType === 'mp3') {
+            options.extractAudio = true;
+            options.audioFormat = 'mp3';
+            options.format = 'bestaudio/best';
+        } else {
+            options.format = 'bestvideo+bestaudio/best';
+            options.mergeOutputFormat = 'mp4';
+        }
+
+        await ytdlp(videoUrl, options);
 
         if (!fs.existsSync(filePath)) throw new Error('Engine failed to produce file.');
 
@@ -94,7 +106,7 @@ app.get('/stream-file', (req, res) => {
 
     res.download(filePath, file, (err) => {
         if (!err) {
-            // Cleanup immediately after download finishes
+            // Cleanup immediately after download finishes to save space
             fs.unlink(filePath, (uErr) => {
                 if (!uErr) console.log(`🗑️ Storage cleared: ${file}`);
             });
