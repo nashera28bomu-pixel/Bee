@@ -1,17 +1,13 @@
 {
   "name": "cymor-all-video-downloader",
-  "version": "2.0.0",
-  "description": "Multi-platform downloader for TikTok, Facebook, YouTube, and Instagram",
+  "version": "2.1.0",
   "main": "script.js",
   "scripts": {
     "start": "node script.js"
   },
-  "engines": {
-    "node": ">=20.0.0"
-  },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "yt-dlp-wrap": "^2.3.12"
+    "yt-dlp-exec": "^1.0.2"
   }
 }
