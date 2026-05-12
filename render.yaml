@@ -1,8 +1,6 @@
 services:
   - type: web
     name: cymorallvideodownloader
-    env: docker  # Changed from node to docker
+    env: docker # Highly recommended over 'node' to ensure FFmpeg is there
     plan: free
-    envVars:
-      - key: NODE_VERSION
-        value: 20
+    numInstances: 1
