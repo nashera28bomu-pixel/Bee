@@ -103,7 +103,6 @@ function updateSpeed(target) {
         mainSpeed.innerText = current.toFixed(1);
         drawGauge(Math.min(current, 100));
 
-        // PUSH TO GRAPH
         if (speedChart.data.labels.length > 50) {
             speedChart.data.labels.shift();
             speedChart.data.datasets[0].data.shift();
@@ -170,41 +169,42 @@ async function runPingTest() {
 async function realDownloadTest() {
     statusText.innerText = "Testing Download...";
     speedSamples = [];
-    const controllers = [];
+    const controller = new AbortController();
 
-    function runStream() {
-        return new Promise(async (resolve) => {
-            const controller = new AbortController();
-            controllers.push(controller);
-            let loaded = 0;
-            const start = performance.now();
-
-            try {
-                const res = await fetch("/download?cache=" + Math.random(), {
-                    signal: controller.signal
-                });
-                const reader = res.body.getReader();
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    loaded += value.length;
-                    const duration = (performance.now() - start) / 1000;
-                    const mbps = (loaded * 8) / duration / 1024 / 1024;
-                    speedSamples.push(mbps);
-                    updateSpeed(mbps);
-                }
-            } catch (e) {}
-            resolve();
+    try {
+        const res = await fetch("/download?cache=" + Date.now(), {
+            signal: controller.signal,
+            mode: 'cors' // Explicitly use CORS
         });
+
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+
+        const reader = res.body.getReader();
+        let loaded = 0;
+        const start = performance.now();
+
+        // Safety timeout: if no data for 10 seconds, abort
+        const timeout = setTimeout(() => controller.abort(), 10000);
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            loaded += value.length;
+            const duration = (performance.now() - start) / 1000;
+            const mbps = (loaded * 8) / duration / 1024 / 1024;
+            speedSamples.push(mbps);
+            updateSpeed(mbps);
+        }
+        clearTimeout(timeout);
+    } catch (e) {
+        console.error("Download Error:", e);
+        statusText.innerText = "❌ Download Failed: Check Console";
+        throw e;
     }
 
-    const timeout = setTimeout(() => controllers.forEach(c => c.abort()), 10000);
-    await Promise.all(Array.from({ length: STREAMS }, runStream));
-    clearTimeout(timeout);
-
     if (speedSamples.length === 0) return 0;
-    const stableSamples = speedSamples.slice(Math.floor(speedSamples.length * 0.5));
-    return stableSamples.reduce((a, b) => a + b, 0) / stableSamples.length;
+    // Return average of last 10 samples for stability
+    return speedSamples.slice(-10).reduce((a, b) => a + b, 0) / 10;
 }
 
 async function realUploadTest() {
@@ -264,7 +264,6 @@ startBtn.addEventListener("click", async () => {
         hero.classList.add("hidden");
         testScreen.classList.remove("hidden");
 
-        // Reset Chart for new test
         speedChart.data.labels = [];
         speedChart.data.datasets[0].data = [];
         speedChart.update();
@@ -276,7 +275,6 @@ startBtn.addEventListener("click", async () => {
         const download = await realDownloadTest();
         
         // 2. Cooldown Phase
-        // Reset speed to 0 and wait 3 seconds to let server CPU/memory settle
         updateSpeed(0); 
         await new Promise(r => setTimeout(r, 3000)); 
 
