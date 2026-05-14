@@ -16,7 +16,8 @@ body{
     overflow-x:hidden;
 }
 
-/* BACKGROUND */
+/* ================= BACKGROUND ================= */
+
 .bg{
     position:fixed;
     inset:0;
@@ -55,7 +56,8 @@ body{
     }
 }
 
-/* HERO */
+/* ================= HERO ================= */
+
 .hero{
     min-height:100vh;
     display:flex;
@@ -89,7 +91,8 @@ h1{
     font-size:1.1rem;
 }
 
-/* BUTTONS */
+/* ================= BUTTONS ================= */
+
 #startBtn,
 #shareBtn{
     border:none;
@@ -115,7 +118,8 @@ h1{
     display:none;
 }
 
-/* TEST SCREEN */
+/* ================= TEST SCREEN ================= */
+
 .test-screen{
     min-height:100vh;
     padding:30px 20px;
@@ -137,70 +141,52 @@ h1{
     color:#bbb;
 }
 
-/* =========================
-   SPEED AREA (UPDATED)
-========================= */
+/* ================= SPEED AREA ================= */
 
 .speed-area{
     text-align:center;
     margin-top:40px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:20px;
 }
 
-/* NEW SPEED CIRCLE */
-.speed-circle {
-    width: 260px;
-    height: 260px;
-    border-radius: 50%;
-    border: 10px solid rgba(0,195,255,0.2);
-    margin: auto;
-    position: relative;
-    box-shadow: 0 0 40px rgba(0,195,255,0.2);
+/* ✅ REQUIRED FIX #1 */
+.speed-circle{
+    position:relative;
+    width:260px;
+    height:260px;
+    margin:auto;
     display:flex;
     align-items:center;
     justify-content:center;
 }
 
-/* spinning ring */
-.speed-circle::after {
-    content: "";
-    position: absolute;
-    inset: 10px;
-    border-radius: 50%;
-    border: 6px solid transparent;
-    border-top-color: var(--blue);
-    animation: spin 1.2s linear infinite;
+/* ✅ REQUIRED FIX #2 */
+canvas#gauge{
+    position:absolute;
+    top:0;
+    left:0;
 }
 
-/* center speed text */
+/* SPEED TEXT */
 .speed-value{
-    font-size:4rem;
+    font-size:6rem;
     font-family:'Orbitron',sans-serif;
     font-weight:900;
     text-shadow:0 0 30px var(--blue);
 }
 
 .speed-unit{
-    font-size:1.2rem;
+    font-size:2rem;
     color:#aaa;
-    margin-top:5px;
 }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-/* STATUS */
 .status{
-    margin-top:10px;
+    margin-top:20px;
     color:var(--blue);
-    font-size:1.1rem;
+    font-size:1.2rem;
 }
 
-/* GRAPH */
+/* ================= GRAPH ================= */
+
 .graph-box{
     width:100%;
     max-width:900px;
@@ -212,7 +198,8 @@ h1{
     backdrop-filter:blur(15px);
 }
 
-/* RESULTS */
+/* ================= RESULTS ================= */
+
 .results-card{
     max-width:1000px;
     margin:50px auto;
@@ -266,7 +253,8 @@ h1{
     margin-top:35px;
 }
 
-/* FOOTER */
+/* ================= FOOTER ================= */
+
 footer{
     text-align:center;
     color:#777;
@@ -274,7 +262,8 @@ footer{
     line-height:1.8;
 }
 
-/* MOBILE */
+/* ================= MOBILE ================= */
+
 @media(max-width:768px){
 
     .logo{
@@ -291,6 +280,6 @@ footer{
     }
 
     .speed-value{
-        font-size:3rem;
+        font-size:4rem;
     }
 }
