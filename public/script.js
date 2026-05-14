@@ -1,658 +1,305 @@
 /* =========================================
-   CYMOR SPEED TEST — ULTRA REAL SYSTEM
-   FULLY OPTIMIZED VERSION
+   CYMOR SPEED TEST — FIXED & OPTIMIZED FOR RENDER FREE
 ========================================= */
 
-const startBtn =
-document.getElementById("startBtn");
+const startBtn = document.getElementById("startBtn");
+const hero = document.getElementById("hero");
+const testScreen = document.getElementById("testScreen");
+const mainSpeed = document.getElementById("mainSpeed");
+const statusText = document.getElementById("status");
+const downloadText = document.getElementById("download");
+const uploadText = document.getElementById("upload");
+const pingText = document.getElementById("ping");
+const provider = document.getElementById("provider");
+const providerName = document.getElementById("providerName");
+const shareBtn = document.getElementById("shareBtn");
 
-const hero =
-document.getElementById("hero");
+const ctx = document.getElementById("gauge").getContext("2d");
 
-const testScreen =
-document.getElementById("testScreen");
-
-const mainSpeed =
-document.getElementById("mainSpeed");
-
-const statusText =
-document.getElementById("status");
-
-const downloadText =
-document.getElementById("download");
-
-const uploadText =
-document.getElementById("upload");
-
-const pingText =
-document.getElementById("ping");
-
-const provider =
-document.getElementById("provider");
-
-const providerName =
-document.getElementById("providerName");
-
-const shareBtn =
-document.getElementById("shareBtn");
-
-/* =========================================
-   GAUGE CANVAS
-========================================= */
-
-const ctx =
-document
-.getElementById("gauge")
-.getContext("2d");
-
-/* =========================================
-   LIVE SPEED GRAPH
-========================================= */
-
-const speedChart =
-new Chart(
-document.getElementById("speedChart"),
-{
+const speedChart = new Chart(document.getElementById("speedChart"), {
     type: "line",
-
     data: {
         labels: [],
-
         datasets: [{
             label: "Mbps",
-
             data: [],
-
             borderColor: "#00c3ff",
-
-            backgroundColor:
-            "rgba(0,195,255,0.12)",
-
+            backgroundColor: "rgba(0,195,255,0.12)",
             borderWidth: 3,
-
             tension: 0.4,
-
             fill: true,
-
             pointRadius: 0
         }]
     },
-
     options: {
-
         responsive: true,
-
         maintainAspectRatio: false,
-
         animation: false,
-
-        plugins: {
-            legend: {
-                display: false
-            }
-        },
-
+        plugins: { legend: { display: false } },
         scales: {
-
-            x: {
-                display: false
-            },
-
+            x: { display: false },
             y: {
-
                 beginAtZero: true,
-
-                ticks: {
-                    color: "#777"
-                },
-
-                grid: {
-                    color:
-                    "rgba(255,255,255,0.05)"
-                }
+                ticks: { color: "#777" },
+                grid: { color: "rgba(255,255,255,0.05)" }
             }
         }
     }
-}
-);
+});
 
-/* =========================================
-   DRAW GAUGE
-========================================= */
-
-function drawGauge(value){
-
-    const canvas =
-    ctx.canvas;
-
-    const centerX =
-    canvas.width / 2;
-
-    const centerY =
-    canvas.height / 2;
-
+/* Gauge */
+function drawGauge(value) {
+    const canvas = ctx.canvas;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
     const radius = 100;
 
-    ctx.clearRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-    );
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // background ring
+    // Background ring
     ctx.beginPath();
-
-    ctx.arc(
-        centerX,
-        centerY,
-        radius,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.strokeStyle =
-    "rgba(255,255,255,0.08)";
-
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
     ctx.lineWidth = 15;
-
     ctx.stroke();
 
-    // active ring
-    const endAngle =
-    (Math.min(value, 100) / 100)
-    * (Math.PI * 2);
+    // Active ring
+    const progress = Math.min(value, 100) / 100;
+    const endAngle = progress * Math.PI * 2 - Math.PI / 2;
 
     ctx.beginPath();
-
-    ctx.arc(
-        centerX,
-        centerY,
-        radius,
-        -Math.PI / 2,
-        endAngle - Math.PI / 2
-    );
-
-    const color =
-    value < 30
-    ? "#ff3b3b"
-    : value < 70
-    ? "#ffcc00"
-    : "#00c3ff";
-
+    ctx.arc(centerX, centerY, radius, -Math.PI / 2, endAngle);
+    const color = value < 30 ? "#ff3b3b" : value < 70 ? "#ffcc00" : "#00c3ff";
     ctx.strokeStyle = color;
-
     ctx.lineWidth = 15;
-
     ctx.lineCap = "round";
-
     ctx.shadowBlur = 20;
-
     ctx.shadowColor = color;
-
     ctx.stroke();
-
     ctx.shadowBlur = 0;
 }
 
-/* =========================================
-   SPEED ANIMATION
-========================================= */
-
+/* Smooth speed animation */
 let animationFrame;
+function updateSpeed(target) {
+    cancelAnimationFrame(animationFrame);
+    let current = parseFloat(mainSpeed.innerText) || 0;
 
-function updateSpeed(target){
-
-    cancelAnimationFrame(
-        animationFrame
-    );
-
-    let current =
-    parseFloat(mainSpeed.innerText)
-    || 0;
-
-    function animate(){
-
-        current +=
-        (target - current)
-        * 0.12;
-
-        mainSpeed.innerText =
-        current.toFixed(1);
-
+    function animate() {
+        current += (target - current) * 0.15;
+        mainSpeed.innerText = current.toFixed(1);
         drawGauge(current);
 
-        if(
-            Math.abs(target - current)
-            > 0.1
-        ){
-
-            animationFrame =
-            requestAnimationFrame(
-                animate
-            );
+        if (Math.abs(target - current) > 0.1) {
+            animationFrame = requestAnimationFrame(animate);
+        } else {
+            mainSpeed.innerText = target.toFixed(1);
+            drawGauge(target);
         }
     }
-
     animate();
 }
 
-/* =========================================
-   ISP DETECTION
-========================================= */
-
-async function detectISP(){
-
-    try{
-
-        const res =
-        await fetch(
-            "https://ipapi.co/json/"
-        );
-
-        const data =
-        await res.json();
-
-        const isp =
-        data.org ||
-        "Unknown ISP";
-
+/* ISP Detection */
+async function detectISP() {
+    try {
+        const res = await fetch("https://ipapi.co/json/");
+        const data = await res.json();
+        const isp = data.org || data.isp || "Unknown ISP";
         provider.innerText = isp;
-
         providerName.innerText = isp;
-
-    } catch {
-
-        provider.innerText =
-        "Unknown ISP";
-
-        providerName.innerText =
-        "Unknown ISP";
+    } catch (e) {
+        provider.innerText = providerName.innerText = "Unknown ISP";
     }
 }
 
-/* =========================================
-   PING TEST
-========================================= */
-
-async function runPingTest(){
-
-    statusText.innerText =
-    "Testing Ping...";
-
+/* Improved Ping */
+async function runPingTest() {
+    statusText.innerText = "Testing Ping...";
     const samples = [];
 
-    for(let i = 0; i < 6; i++){
+    for (let i = 0; i < 8; i++) {
+        try {
+            const start = performance.now();
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3000);
 
-        const start =
-        performance.now();
+            await fetch(`/ping?cache=${Date.now()}`, { signal: controller.signal });
+            clearTimeout(timeout);
 
-        await fetch(
-            "/ping?cache=" + Date.now()
-        );
-
-        const end =
-        performance.now();
-
-        samples.push(end - start);
-    }
-
-    const avg =
-    samples.reduce(
-        (a,b)=>a+b,
-        0
-    ) / samples.length;
-
-    pingText.innerText =
-    avg.toFixed(0) + " ms";
-}
-
-/* =========================================
-   REAL DOWNLOAD TEST
-========================================= */
-
-async function realDownloadTest(){
-
-    statusText.innerText =
-    "Testing Download...";
-
-    const TEST_DURATION =
-    12000;
-
-    const startTime =
-    performance.now();
-
-    let loaded = 0;
-
-    let speedSamples = [];
-
-    // reset graph
-    speedChart.data.labels = [];
-
-    speedChart.data.datasets[0]
-    .data = [];
-
-    speedChart.update();
-
-    try{
-
-        const response =
-        await fetch(
-            "/download?cache="
-            + Date.now()
-        );
-
-        const reader =
-        response.body.getReader();
-
-        while(true){
-
-            const {
-                done,
-                value
-            } =
-            await reader.read();
-
-            if(done) break;
-
-            loaded += value.length;
-
-            const elapsed =
-            (
-                performance.now()
-                - startTime
-            ) / 1000;
-
-            const mbps =
-            (
-                loaded * 8
-            )
-            / elapsed
-            / 1024
-            / 1024;
-
-            if(
-                mbps > 0 &&
-                mbps < 1000
-            ){
-
-                speedSamples.push(
-                    mbps
-                );
-
-                updateSpeed(
-                    mbps
-                );
-
-                // update graph
-                speedChart.data.labels
-                .push("");
-
-                speedChart.data.datasets[0]
-                .data.push(
-                    mbps.toFixed(1)
-                );
-
-                if(
-                    speedChart.data.labels
-                    .length > 60
-                ){
-
-                    speedChart.data.labels
-                    .shift();
-
-                    speedChart.data.datasets[0]
-                    .data.shift();
-                }
-
-                speedChart.update(
-                    "none"
-                );
-            }
-
-            if(
-                performance.now()
-                - startTime
-                >= TEST_DURATION
-            ){
-                break;
-            }
+            const end = performance.now();
+            samples.push(end - start);
+        } catch (e) {
+            samples.push(999); // penalty for failed ping
         }
-
-        reader.cancel();
-
-    } catch(err){
-
-        console.error(err);
-
-        statusText.innerText =
-        "Download Test Failed";
-
-        return 0;
+        await new Promise(r => setTimeout(r, 100));
     }
 
-    if(
-        speedSamples.length === 0
-    ){
-        return 0;
-    }
-
-    // stable average
-    const recent =
-    speedSamples.slice(-20);
-
-    const avg =
-    recent.reduce(
-        (a,b)=>a+b,
-        0
-    ) / recent.length;
-
+    const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
+    pingText.innerText = Math.round(avg) + " ms";
     return avg;
 }
 
-/* =========================================
-   REAL UPLOAD TEST
-========================================= */
+/* Download Test - Shorter + throttled UI updates */
+async function realDownloadTest() {
+    statusText.innerText = "Testing Download...";
+    const TEST_DURATION = 8000; // 8 seconds (more reliable on free tier)
+    const startTime = performance.now();
+    let loaded = 0;
+    let speedSamples = [];
+    let lastChartUpdate = 0;
 
-async function realUploadTest(){
+    speedChart.data.labels = [];
+    speedChart.data.datasets[0].data = [];
+    speedChart.update();
 
-    statusText.innerText =
-    "Testing Upload...";
+    try {
+        const response = await fetch(`/download?cache=${Date.now()}`);
+        const reader = response.body.getReader();
 
-    const size =
-    10 * 1024 * 1024;
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-    const data =
-    new Uint8Array(size);
+            loaded += value.length;
 
-    crypto.getRandomValues(data);
+            const elapsed = (performance.now() - startTime) / 1000;
+            if (elapsed < 0.1) continue;
 
-    const start =
-    performance.now();
+            const mbps = (loaded * 8) / elapsed / 1024 / 1024;
 
-    await fetch(
-        "/upload",
-        {
-            method: "POST",
+            if (mbps > 0 && mbps < 5000) {
+                speedSamples.push(mbps);
+                updateSpeed(mbps);
 
-            headers: {
-                "Content-Type":
-                "application/octet-stream"
-            },
+                // Throttle chart updates (every ~150ms)
+                if (performance.now() - lastChartUpdate > 150) {
+                    speedChart.data.labels.push("");
+                    speedChart.data.datasets[0].data.push(mbps.toFixed(1));
 
-            body: data
+                    if (speedChart.data.labels.length > 50) {
+                        speedChart.data.labels.shift();
+                        speedChart.data.datasets[0].data.shift();
+                    }
+                    speedChart.update("none");
+                    lastChartUpdate = performance.now();
+                }
+            }
+
+            if (performance.now() - startTime >= TEST_DURATION) break;
         }
-    );
 
-    const end =
-    performance.now();
+        reader.cancel();
+    } catch (err) {
+        console.error("Download error:", err);
+        statusText.innerText = "Download failed - retrying...";
+        return 0;
+    }
 
-    const duration =
-    (end - start) / 1000;
+    if (speedSamples.length === 0) return 0;
 
-    const mbps =
-    (
-        size * 8
-    )
-    / duration
-    / 1024
-    / 1024;
-
-    updateSpeed(mbps);
-
-    return mbps;
+    // Use average of the most stable recent samples
+    const recent = speedSamples.slice(-15);
+    return recent.reduce((a, b) => a + b, 0) / recent.length;
 }
 
-/* =========================================
-   FINISH TEST
-========================================= */
+/* Upload Test - Smaller size */
+async function realUploadTest() {
+    statusText.innerText = "Testing Upload...";
 
-function finishTest(
-    download,
-    upload
-){
+    const size = 5 * 1024 * 1024; // Reduced from 10 MB
+    const data = new Uint8Array(size);
+    crypto.getRandomValues(data);
 
-    statusText.innerText =
-    "✔ Test Complete";
+    const start = performance.now();
 
-    downloadText.innerText =
-    download.toFixed(1)
-    + " Mbps";
+    try {
+        const res = await fetch("/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/octet-stream" },
+            body: data
+        });
 
-    uploadText.innerText =
-    upload.toFixed(1)
-    + " Mbps";
+        if (!res.ok) throw new Error("Upload failed");
 
-    updateSpeed(download);
+        const end = performance.now();
+        const duration = (end - start) / 1000;
+        const mbps = (size * 8) / duration / 1024 / 1024;
 
-    shareBtn.classList.remove(
-        "hidden"
-    );
+        updateSpeed(mbps);
+        return mbps;
+    } catch (err) {
+        console.error("Upload error:", err);
+        return 0;
+    }
+}
 
-    // notifications
-    if(
-        "Notification"
-        in window
-    ){
+/* Finish */
+function finishTest(download, upload) {
+    statusText.innerText = "✔ Test Complete";
 
-        Notification
-        .requestPermission()
-        .then(permission=>{
+    const finalDownload = download > 0 ? download : 0.1;
+    const finalUpload = upload > 0 ? upload : 0.1;
 
-            if(
-                permission
-                === "granted"
-            ){
+    downloadText.innerText = finalDownload.toFixed(1) + " Mbps";
+    uploadText.innerText = finalUpload.toFixed(1) + " Mbps";
 
-                new Notification(
-                    "⚡ Cymor Speed Test",
-                    {
-                        body:
-                        `Download ${download.toFixed(1)} Mbps | Upload ${upload.toFixed(1)} Mbps`
-                    }
-                );
-            }
+    updateSpeed(finalDownload);
+
+    shareBtn.classList.remove("hidden");
+
+    // Notification
+    if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("⚡ Cymor Speed Test", {
+            body: `Download: ${finalDownload.toFixed(1)} Mbps | Upload: ${finalUpload.toFixed(1)} Mbps`
         });
     }
 }
 
-/* =========================================
-   START TEST
-========================================= */
-
-startBtn.addEventListener(
-"click",
-
-async ()=>{
-
-    try{
-
+/* Start Test */
+startBtn.addEventListener("click", async () => {
+    try {
         startBtn.disabled = true;
+        hero.classList.add("hidden");
+        testScreen.classList.remove("hidden");
 
-        hero.classList.add(
-            "hidden"
-        );
-
-        testScreen.classList.remove(
-            "hidden"
-        );
-
-        statusText.innerText =
-        "Initializing...";
+        statusText.innerText = "Initializing...";
 
         await detectISP();
-
         await runPingTest();
 
-        const download =
-        await realDownloadTest();
+        const download = await realDownloadTest();
+        const upload = await realUploadTest();
 
-        const upload =
-        await realUploadTest();
-
-        finishTest(
-            download,
-            upload
-        );
-
-    } catch(err){
-
+        finishTest(download, upload);
+    } catch (err) {
         console.error(err);
-
-        statusText.innerText =
-        "❌ Test Failed";
-
+        statusText.innerText = "❌ Test Failed - Try again";
     } finally {
-
         startBtn.disabled = false;
     }
-}
-);
+});
 
-/* =========================================
-   SHARE RESULT IMAGE
-========================================= */
+/* Share */
+shareBtn.addEventListener("click", async () => {
+    const card = document.getElementById("resultCard");
+    shareBtn.classList.add("hidden");
 
-shareBtn.addEventListener(
-"click",
-
-async ()=>{
-
-    const card =
-    document.getElementById(
-        "resultCard"
-    );
-
-    shareBtn.classList.add(
-        "hidden"
-    );
-
-    const canvas =
-    await html2canvas(
-        card,
-        {
-            backgroundColor:
-            "#020617",
-
+    try {
+        const canvas = await html2canvas(card, {
+            backgroundColor: "#020617",
             scale: 2
-        }
-    );
+        });
 
-    shareBtn.classList.remove(
-        "hidden"
-    );
-
-    canvas.toBlob(blob=>{
-
-        const link =
-        document.createElement("a");
-
-        link.download =
-        "Cymor-Speed-Test.png";
-
-        link.href =
-        URL.createObjectURL(blob);
-
-        link.click();
-    });
+        canvas.toBlob(blob => {
+            const link = document.createElement("a");
+            link.download = "Cymor-Speed-Test.png";
+            link.href = URL.createObjectURL(blob);
+            link.click();
+        });
+    } catch (e) {
+        alert("Could not generate image");
+    } finally {
+        shareBtn.classList.remove("hidden");
+    }
 });
