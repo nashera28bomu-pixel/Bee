@@ -1,81 +1,114 @@
-const startBtn = document.getElementById("startBtn");
-const hero = document.getElementById("hero");
-const testScreen = document.getElementById("testScreen");
+/* =========================================
+   CYMOR SPEED TEST — ULTRA REAL SYSTEM
+   FULLY OPTIMIZED VERSION
+========================================= */
 
-const mainSpeed = document.getElementById("mainSpeed");
-const statusText = document.getElementById("status");
+const startBtn =
+document.getElementById("startBtn");
 
-const downloadText = document.getElementById("download");
-const uploadText = document.getElementById("upload");
-const pingText = document.getElementById("ping");
+const hero =
+document.getElementById("hero");
 
-const provider = document.getElementById("provider");
-const providerName = document.getElementById("providerName");
+const testScreen =
+document.getElementById("testScreen");
 
-const shareBtn = document.getElementById("shareBtn");
+const mainSpeed =
+document.getElementById("mainSpeed");
+
+const statusText =
+document.getElementById("status");
+
+const downloadText =
+document.getElementById("download");
+
+const uploadText =
+document.getElementById("upload");
+
+const pingText =
+document.getElementById("ping");
+
+const provider =
+document.getElementById("provider");
+
+const providerName =
+document.getElementById("providerName");
+
+const shareBtn =
+document.getElementById("shareBtn");
+
+/* =========================================
+   GAUGE CANVAS
+========================================= */
 
 const ctx =
-document.getElementById("gauge").getContext("2d");
+document
+.getElementById("gauge")
+.getContext("2d");
 
-/* ======================
+/* =========================================
    LIVE SPEED GRAPH
-====================== */
+========================================= */
 
 const speedChart =
 new Chart(
 document.getElementById("speedChart"),
 {
-    type:"line",
+    type: "line",
 
-    data:{
-        labels:[],
+    data: {
+        labels: [],
 
-        datasets:[{
-            label:"Mbps",
+        datasets: [{
+            label: "Mbps",
 
-            data:[],
+            data: [],
 
-            borderColor:"#00c3ff",
+            borderColor: "#00c3ff",
 
             backgroundColor:
-            "rgba(0,195,255,0.15)",
+            "rgba(0,195,255,0.12)",
 
-            borderWidth:3,
+            borderWidth: 3,
 
-            tension:0.4,
+            tension: 0.4,
 
-            fill:true,
+            fill: true,
 
-            pointRadius:0
+            pointRadius: 0
         }]
     },
 
-    options:{
-        responsive:true,
+    options: {
 
-        maintainAspectRatio:false,
+        responsive: true,
 
-        plugins:{
-            legend:{
-                display:false
+        maintainAspectRatio: false,
+
+        animation: false,
+
+        plugins: {
+            legend: {
+                display: false
             }
         },
 
-        scales:{
+        scales: {
 
-            x:{
-                display:false
+            x: {
+                display: false
             },
 
-            y:{
-                beginAtZero:true,
+            y: {
 
-                ticks:{
-                    color:"#888"
+                beginAtZero: true,
+
+                ticks: {
+                    color: "#777"
                 },
 
-                grid:{
-                    color:"rgba(255,255,255,0.05)"
+                grid: {
+                    color:
+                    "rgba(255,255,255,0.05)"
                 }
             }
         }
@@ -83,16 +116,20 @@ document.getElementById("speedChart"),
 }
 );
 
-/* ======================
-   GAUGE
-====================== */
+/* =========================================
+   DRAW GAUGE
+========================================= */
 
-function drawGauge(value) {
+function drawGauge(value){
 
-    const canvas = ctx.canvas;
+    const canvas =
+    ctx.canvas;
 
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
+    const centerX =
+    canvas.width / 2;
+
+    const centerY =
+    canvas.height / 2;
 
     const radius = 100;
 
@@ -123,7 +160,8 @@ function drawGauge(value) {
 
     // active ring
     const endAngle =
-    (value / 100) * (Math.PI * 2);
+    (Math.min(value, 100) / 100)
+    * (Math.PI * 2);
 
     ctx.beginPath();
 
@@ -135,57 +173,61 @@ function drawGauge(value) {
         endAngle - Math.PI / 2
     );
 
-    ctx.strokeStyle =
-        value < 30
-        ? "#ff3b3b"
-        : value < 70
-        ? "#ffcc00"
-        : "#00c3ff";
-
-    ctx.lineWidth = 15;
-
-    ctx.lineCap = "round";
-
-    ctx.shadowBlur = 25;
-
-    ctx.shadowColor =
+    const color =
     value < 30
     ? "#ff3b3b"
     : value < 70
     ? "#ffcc00"
     : "#00c3ff";
 
+    ctx.strokeStyle = color;
+
+    ctx.lineWidth = 15;
+
+    ctx.lineCap = "round";
+
+    ctx.shadowBlur = 20;
+
+    ctx.shadowColor = color;
+
     ctx.stroke();
 
     ctx.shadowBlur = 0;
 }
 
-/* ======================
-   SPEED UPDATE
-====================== */
+/* =========================================
+   SPEED ANIMATION
+========================================= */
 
-function updateSpeed(target) {
+let animationFrame;
+
+function updateSpeed(target){
+
+    cancelAnimationFrame(
+        animationFrame
+    );
 
     let current =
     parseFloat(mainSpeed.innerText)
     || 0;
 
-    function animate() {
+    function animate(){
 
         current +=
-        (target - current) * 0.08;
+        (target - current)
+        * 0.12;
 
         mainSpeed.innerText =
         current.toFixed(1);
 
-        drawGauge(
-            Math.min(current, 100)
-        );
+        drawGauge(current);
 
-        if (
+        if(
             Math.abs(target - current)
             > 0.1
-        ) {
+        ){
+
+            animationFrame =
             requestAnimationFrame(
                 animate
             );
@@ -195,13 +237,13 @@ function updateSpeed(target) {
     animate();
 }
 
-/* ======================
+/* =========================================
    ISP DETECTION
-====================== */
+========================================= */
 
-async function detectISP() {
+async function detectISP(){
 
-    try {
+    try{
 
         const res =
         await fetch(
@@ -212,7 +254,8 @@ async function detectISP() {
         await res.json();
 
         const isp =
-        data.org || "Unknown ISP";
+        data.org ||
+        "Unknown ISP";
 
         provider.innerText = isp;
 
@@ -224,27 +267,29 @@ async function detectISP() {
         "Unknown ISP";
 
         providerName.innerText =
-        "Unknown";
+        "Unknown ISP";
     }
 }
 
-/* ======================
+/* =========================================
    PING TEST
-====================== */
+========================================= */
 
-async function runPingTest() {
+async function runPingTest(){
 
     statusText.innerText =
     "Testing Ping...";
 
     const samples = [];
 
-    for(let i = 0; i < 5; i++) {
+    for(let i = 0; i < 6; i++){
 
         const start =
         performance.now();
 
-        await fetch("/ping");
+        await fetch(
+            "/ping?cache=" + Date.now()
+        );
 
         const end =
         performance.now();
@@ -253,29 +298,33 @@ async function runPingTest() {
     }
 
     const avg =
-    samples.reduce((a,b)=>a+b)
-    / samples.length;
+    samples.reduce(
+        (a,b)=>a+b,
+        0
+    ) / samples.length;
 
     pingText.innerText =
     avg.toFixed(0) + " ms";
 }
 
-/* ======================
-   DOWNLOAD TEST
-====================== */
+/* =========================================
+   REAL DOWNLOAD TEST
+========================================= */
 
-async function realDownloadTest() {
+async function realDownloadTest(){
 
     statusText.innerText =
     "Testing Download...";
 
-    let speedSamples = [];
+    const TEST_DURATION =
+    12000;
 
     const startTime =
     performance.now();
 
-    const TEST_DURATION =
-    12000;
+    let loaded = 0;
+
+    let speedSamples = [];
 
     // reset graph
     speedChart.data.labels = [];
@@ -285,7 +334,7 @@ async function realDownloadTest() {
 
     speedChart.update();
 
-    try {
+    try{
 
         const response =
         await fetch(
@@ -296,13 +345,7 @@ async function realDownloadTest() {
         const reader =
         response.body.getReader();
 
-        let loaded = 0;
-
-        while (
-            performance.now()
-            - startTime
-            < TEST_DURATION
-        ) {
+        while(true){
 
             const {
                 done,
@@ -314,24 +357,24 @@ async function realDownloadTest() {
 
             loaded += value.length;
 
-            const duration =
+            const elapsed =
             (
                 performance.now()
                 - startTime
             ) / 1000;
 
             const mbps =
-            (loaded * 8)
-            / duration
+            (
+                loaded * 8
+            )
+            / elapsed
             / 1024
             / 1024;
 
-            // remove fake spikes
             if(
-                mbps > 0
-                &&
-                mbps < 1000
-            ) {
+                mbps > 0 &&
+                mbps < 5000
+            ){
 
                 speedSamples.push(
                     mbps
@@ -341,17 +384,19 @@ async function realDownloadTest() {
                     mbps
                 );
 
-                // graph update
+                // update graph
                 speedChart.data.labels
                 .push("");
 
                 speedChart.data.datasets[0]
-                .data.push(mbps);
+                .data.push(
+                    mbps.toFixed(1)
+                );
 
                 if(
                     speedChart.data.labels
-                    .length > 40
-                ) {
+                    .length > 60
+                ){
 
                     speedChart.data.labels
                     .shift();
@@ -364,45 +409,58 @@ async function realDownloadTest() {
                     "none"
                 );
             }
+
+            if(
+                performance.now()
+                - startTime
+                >= TEST_DURATION
+            ){
+                break;
+            }
         }
 
         reader.cancel();
 
-    } catch(err) {
+    } catch(err){
 
         console.error(err);
 
         statusText.innerText =
-        "Download stream interrupted";
+        "Download Test Failed";
+
+        return 0;
     }
 
     if(
         speedSamples.length === 0
-    ) {
+    ){
         return 0;
     }
 
+    // stable average
     const recent =
-    speedSamples.slice(-15);
+    speedSamples.slice(-20);
 
     const avg =
-    recent.reduce((a,b)=>a+b,0)
-    / recent.length;
+    recent.reduce(
+        (a,b)=>a+b,
+        0
+    ) / recent.length;
 
     return avg;
 }
 
-/* ======================
-   UPLOAD TEST
-====================== */
+/* =========================================
+   REAL UPLOAD TEST
+========================================= */
 
-async function realUploadTest() {
+async function realUploadTest(){
 
     statusText.innerText =
     "Testing Upload...";
 
     const size =
-    3 * 1024 * 1024;
+    10 * 1024 * 1024;
 
     const data =
     new Uint8Array(size);
@@ -412,12 +470,19 @@ async function realUploadTest() {
     const start =
     performance.now();
 
-    await fetch("/upload",{
+    await fetch(
+        "/upload",
+        {
+            method: "POST",
 
-        method:"POST",
+            headers: {
+                "Content-Type":
+                "application/octet-stream"
+            },
 
-        body:data
-    });
+            body: data
+        }
+    );
 
     const end =
     performance.now();
@@ -438,14 +503,14 @@ async function realUploadTest() {
     return mbps;
 }
 
-/* ======================
-   FINISH
-====================== */
+/* =========================================
+   FINISH TEST
+========================================= */
 
 function finishTest(
     download,
     upload
-) {
+){
 
     statusText.innerText =
     "✔ Test Complete";
@@ -464,8 +529,11 @@ function finishTest(
         "hidden"
     );
 
-    // browser notification
-    if("Notification" in window){
+    // notifications
+    if(
+        "Notification"
+        in window
+    ){
 
         Notification
         .requestPermission()
@@ -477,7 +545,7 @@ function finishTest(
             ){
 
                 new Notification(
-                    "⚡ Cymor Test Complete",
+                    "⚡ Cymor Speed Test",
                     {
                         body:
                         `Download ${download.toFixed(1)} Mbps | Upload ${upload.toFixed(1)} Mbps`
@@ -488,9 +556,9 @@ function finishTest(
     }
 }
 
-/* ======================
+/* =========================================
    START TEST
-====================== */
+========================================= */
 
 startBtn.addEventListener(
 "click",
@@ -541,9 +609,9 @@ async ()=>{
 }
 );
 
-/* ======================
-   SHARE RESULTS IMAGE
-====================== */
+/* =========================================
+   SHARE RESULT IMAGE
+========================================= */
 
 shareBtn.addEventListener(
 "click",
@@ -566,7 +634,7 @@ async ()=>{
             backgroundColor:
             "#020617",
 
-            scale:2
+            scale: 2
         }
     );
 
@@ -577,19 +645,14 @@ async ()=>{
     canvas.toBlob(blob=>{
 
         const link =
-        document.createElement(
-            "a"
-        );
+        document.createElement("a");
 
         link.download =
         "Cymor-Speed-Test.png";
 
         link.href =
-        URL.createObjectURL(
-            blob
-        );
+        URL.createObjectURL(blob);
 
         link.click();
     });
-}
-);
+});
