@@ -1,3 +1,8 @@
+/**
+ * Cymor Online Speed Test - Core Script
+ * Powered by Cymor
+ */
+
 const startBtn = document.getElementById("startBtn");
 const hero = document.getElementById("hero");
 const testScreen = document.getElementById("testScreen");
@@ -13,20 +18,51 @@ const provider = document.getElementById("provider");
 const providerName = document.getElementById("providerName");
 
 const shareBtn = document.getElementById("shareBtn");
-
 const ctx = document.getElementById("gauge").getContext("2d");
 
 /* ======================
-   SETTINGS (FIXED)
+   SETTINGS & STATE
 ====================== */
-
 let STREAMS = 4;
 let speedSamples = [];
 
 /* ======================
-   GAUGE
+   CHART INITIALIZATION
 ====================== */
+const speedChartCtx = document.getElementById('speedChart').getContext('2d');
+let speedChart = new Chart(speedChartCtx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'Live Speed (Mbps)',
+            data: [],
+            borderColor: '#00c3ff',
+            backgroundColor: 'rgba(0, 195, 255, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            x: { display: false },
+            y: { 
+                beginAtZero: true,
+                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                ticks: { color: '#aaa' }
+            }
+        },
+        plugins: { legend: { display: false } }
+    }
+});
 
+/* ======================
+   GAUGE DRAWING
+====================== */
 function drawGauge(value) {
     const canvas = ctx.canvas;
     const centerX = canvas.width / 2;
@@ -56,9 +92,8 @@ function drawGauge(value) {
 }
 
 /* ======================
-   SPEED ANIMATION
+   SPEED ANIMATION & GRAPH UPDATE
 ====================== */
-
 function updateSpeed(target) {
     let current = parseFloat(mainSpeed.innerText) || 0;
 
@@ -66,6 +101,15 @@ function updateSpeed(target) {
         current += (target - current) * 0.12;
         mainSpeed.innerText = current.toFixed(1);
         drawGauge(Math.min(current, 100));
+
+        // PUSH TO GRAPH
+        if (speedChart.data.labels.length > 50) {
+            speedChart.data.labels.shift();
+            speedChart.data.datasets[0].data.shift();
+        }
+        speedChart.data.labels.push("");
+        speedChart.data.datasets[0].data.push(current);
+        speedChart.update('none'); 
 
         if (Math.abs(target - current) > 0.2) {
             requestAnimationFrame(step);
@@ -75,24 +119,19 @@ function updateSpeed(target) {
 }
 
 /* ======================
-   NOTIFICATION
+   UTILITIES
 ====================== */
-
 async function notifyDone(download, upload) {
     if (!("Notification" in window)) return;
     if (Notification.permission === "default") {
         await Notification.requestPermission();
     }
     if (Notification.permission === "granted") {
-        new Notification("⚡ Cymor Online Speed Test Complete", {
+        new Notification("⚡ Cymor Test Complete", {
             body: `Download: ${download.toFixed(1)} Mbps | Upload: ${upload.toFixed(1)} Mbps`
         });
     }
 }
-
-/* ======================
-   ISP DETECTION
-====================== */
 
 async function detectISP() {
     try {
@@ -108,9 +147,8 @@ async function detectISP() {
 }
 
 /* ======================
-   PING TEST
+   TEST MODULES
 ====================== */
-
 async function runPingTest() {
     statusText.innerText = "Testing Ping...";
     const samples = [];
@@ -127,10 +165,6 @@ async function runPingTest() {
     const avg = samples.reduce((a, b) => a + b) / samples.length;
     pingText.innerText = avg.toFixed(0) + " ms";
 }
-
-/* ======================
-   DOWNLOAD TEST
-====================== */
 
 async function realDownloadTest() {
     statusText.innerText = "Testing Download...";
@@ -163,29 +197,23 @@ async function realDownloadTest() {
         });
     }
 
-    const timeout = setTimeout(() => controllers.forEach(c => c.abort()), 10000); // 10s for speed
+    const timeout = setTimeout(() => controllers.forEach(c => c.abort()), 10000);
     await Promise.all(Array.from({ length: STREAMS }, runStream));
     clearTimeout(timeout);
 
     if (speedSamples.length === 0) return 0;
-    
-    // Use the 80th percentile or the latter half of samples for a more accurate sustained speed
     const stableSamples = speedSamples.slice(Math.floor(speedSamples.length * 0.5));
     return stableSamples.reduce((a, b) => a + b, 0) / stableSamples.length;
 }
 
-/* ======================
-   UPLOAD TEST (FIXED)
-====================== */
-
 async function realUploadTest() {
     statusText.innerText = "Testing Upload...";
-    const chunkSize = 1024 * 1024 * 1.5; // 1.5MB chunks
+    const chunkSize = 1024 * 1024 * 1.5; 
     const data = new Uint8Array(chunkSize);
     crypto.getRandomValues(data);
 
     let uploadSamples = [];
-    const testDuration = 8000; // 8 seconds test
+    const testDuration = 8000; 
     const endTime = performance.now() + testDuration;
 
     while (performance.now() < endTime) {
@@ -200,7 +228,6 @@ async function realUploadTest() {
             const duration = (end - start) / 1000;
             const mbps = (chunkSize * 8) / duration / 1024 / 1024;
             
-            // Filter out unrealistic spikes (e.g. localhost/cache hits)
             if (mbps < 5000) { 
                 uploadSamples.push(mbps);
                 updateSpeed(mbps);
@@ -216,9 +243,8 @@ async function realUploadTest() {
 }
 
 /* ======================
-   FINISH TEST
+   FLOW CONTROL
 ====================== */
-
 function finishTest(download, upload) {
     statusText.innerText = "✔ Test Complete";
     downloadText.innerText = download.toFixed(1) + " Mbps";
@@ -228,22 +254,22 @@ function finishTest(download, upload) {
     notifyDone(download, upload);
 }
 
-/* ======================
-   START TEST FLOW
-====================== */
-
 startBtn.addEventListener("click", async () => {
     try {
         startBtn.disabled = true;
         hero.classList.add("hidden");
         testScreen.classList.remove("hidden");
 
+        // Reset Chart for new test
+        speedChart.data.labels = [];
+        speedChart.data.datasets[0].data = [];
+        speedChart.update();
+
         await detectISP();
         await runPingTest();
 
         const download = await realDownloadTest();
         
-        // Reset gauge briefly before upload
         updateSpeed(0); 
         await new Promise(r => setTimeout(r, 500));
 
@@ -256,4 +282,20 @@ startBtn.addEventListener("click", async () => {
     } finally {
         startBtn.disabled = false;
     }
+});
+
+/* ======================
+   SHARE LOGIC
+====================== */
+shareBtn.addEventListener("click", () => {
+    const card = document.getElementById("resultCard");
+    shareBtn.classList.add("hidden");
+    
+    html2canvas(card, { backgroundColor: "#0b0e14", scale: 2 }).then(canvas => {
+        const link = document.createElement("a");
+        link.download = "Cymor-Speedtest.png";
+        link.href = canvas.toDataURL();
+        link.click();
+        shareBtn.classList.remove("hidden");
+    });
 });
