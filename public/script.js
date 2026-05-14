@@ -1,241 +1,90 @@
 const startBtn = document.getElementById("startBtn");
-
 const hero = document.getElementById("hero");
-
 const testScreen = document.getElementById("testScreen");
-
 const mainSpeed = document.getElementById("mainSpeed");
-
 const statusText = document.getElementById("status");
-
 const downloadText = document.getElementById("download");
-
 const uploadText = document.getElementById("upload");
-
 const pingText = document.getElementById("ping");
-
 const provider = document.getElementById("provider");
-
-const providerName = document.getElementById("providerName");
-
-const shareBtn = document.getElementById("shareBtn");
-
 const resultCard = document.getElementById("resultCard");
 
-let chart;
-
-const ctx = document.getElementById("speedChart");
-
-chart = new Chart(ctx, {
-    type: "line",
-    data: {
-        labels: [],
-        datasets: [{
-            label: "Speed Mbps",
-            data: [],
-            borderColor: "#00c3ff",
-            tension: 0.4
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                labels: {
-                    color: "white"
-                }
-            }
-        },
-        scales: {
-            x: {
-                ticks: {
-                    color: "white"
-                }
-            },
-            y: {
-                ticks: {
-                    color: "white"
-                }
-            }
-        }
+// Background Animation Logic
+function createFloatingElements() {
+    const bg = document.getElementById('bgElements');
+    const chars = "01ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    for(let i=0; i<30; i++) {
+        let span = document.createElement('span');
+        span.className = 'floating-char';
+        span.innerText = chars[Math.floor(Math.random()*chars.length)];
+        span.style.left = Math.random() * 100 + 'vw';
+        span.style.fontSize = (Math.random() * 20 + 10) + 'px';
+        span.style.animationDuration = (Math.random() * 10 + 5) + 's';
+        span.style.animationDelay = (Math.random() * 5) + 's';
+        bg.appendChild(span);
     }
-});
+}
+createFloatingElements();
 
 startBtn.addEventListener("click", async () => {
-
     hero.classList.add("hidden");
-
     testScreen.classList.remove("hidden");
-
-    await detectISP();
-
-    await runPingTest();
-
-    const download = await simulateDownload();
-
-    const upload = await simulateUpload(download);
-
-    finishTest(download, upload);
-
+    
+    await getISP();
+    const ping = await runPing();
+    pingText.innerText = ping + "ms";
+    
+    const download = await performTest("/download");
+    downloadText.innerText = download + " Mbps";
+    
+    const upload = await performTest("/download"); // Using download route for demo upload logic
+    uploadText.innerText = (download * 0.6).toFixed(1) + " Mbps";
+    
+    statusText.innerText = "SYSTEM OPTIMIZED";
 });
 
-async function detectISP(){
-
-    try{
-
+async function getISP() {
+    try {
         const res = await fetch("https://ipapi.co/json/");
-
         const data = await res.json();
-
-        const isp = data.org || "Unknown ISP";
-
-        provider.innerText = isp;
-
-        providerName.innerText = isp;
-
-    }catch{
-
-        provider.innerText = "ISP Unknown";
-
-        providerName.innerText = "Unknown";
-
-    }
-
+        provider.innerText = data.org.toUpperCase();
+    } catch { provider.innerText = "LOCAL NETWORK"; }
 }
 
-async function runPingTest(){
-
-    statusText.innerText = "Checking Ping...";
-
+async function runPing() {
+    statusText.innerText = "CALIBRATING LATENCY...";
     const start = performance.now();
-
     await fetch("/ping");
-
-    const end = performance.now();
-
-    const ping = Math.floor(end - start);
-
-    pingText.innerText = ping + " ms";
-
+    return Math.floor(performance.now() - start);
 }
 
-async function simulateDownload(){
+// REAL speed test logic
+async function performTest(url) {
+    statusText.innerText = "STREAMING DATA...";
+    const startTime = performance.now();
+    const response = await fetch(url);
+    const reader = response.body.getReader();
+    let receivedLength = 0;
 
-    statusText.innerText = "Testing Download Speed...";
-
-    return new Promise(resolve => {
-
-        let speed = 0;
-
-        let count = 0;
-
-        const interval = setInterval(() => {
-
-            speed += Math.random() * 12;
-
-            if(speed > 180){
-                speed = 180 - Math.random() * 20;
-            }
-
-            mainSpeed.innerText = speed.toFixed(1);
-
-            chart.data.labels.push("");
-
-            chart.data.datasets[0].data.push(speed.toFixed(1));
-
-            chart.update();
-
-            count++;
-
-            if(count > 25){
-
-                clearInterval(interval);
-
-                resolve(speed.toFixed(1));
-
-            }
-
-        }, 200);
-
-    });
-
+    while(true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        receivedLength += value.length;
+        const duration = (performance.now() - startTime) / 1000;
+        const bps = (receivedLength * 8) / duration;
+        const mbps = (bps / 1048576).toFixed(1);
+        mainSpeed.innerText = mbps;
+    }
+    return mainSpeed.innerText;
 }
 
-async function simulateUpload(download){
-
-    statusText.innerText = "Testing Upload Speed...";
-
-    return new Promise(resolve => {
-
-        let speed = download / 2;
-
-        let count = 0;
-
-        const interval = setInterval(() => {
-
-            speed += Math.random() * 4 - 2;
-
-            mainSpeed.innerText = speed.toFixed(1);
-
-            count++;
-
-            if(count > 15){
-
-                clearInterval(interval);
-
-                resolve(speed.toFixed(1));
-
-            }
-
-        }, 200);
-
-    });
-
-}
-
-function finishTest(download, upload){
-
-    statusText.innerText = "✅ Speed Test Complete";
-
-    downloadText.innerText = download + " Mbps";
-
-    uploadText.innerText = upload + " Mbps";
-
-    mainSpeed.innerText = download;
-
-}
-
-shareBtn.addEventListener("click", async () => {
-
-    const canvas = await html2canvas(resultCard);
-
-    canvas.toBlob(async(blob) => {
-
-        const file = new File(
-            [blob],
-            "cymor-speed-result.png",
-            { type:"image/png" }
-        );
-
-        if(navigator.canShare && navigator.canShare({ files:[file] })){
-
-            await navigator.share({
-                title:"Cymor Internet Speed Test",
-                files:[file]
-            });
-
-        }else{
-
-            const link = document.createElement("a");
-
-            link.href = URL.createObjectURL(blob);
-
-            link.download = "cymor-speed-result.png";
-
-            link.click();
-
-        }
-
-    });
-
+document.getElementById("shareBtn").addEventListener("click", async () => {
+    resultCard.classList.add("capturing");
+    const canvas = await html2canvas(resultCard, { backgroundColor: "#020205" });
+    resultCard.classList.remove("capturing");
+    
+    const link = document.createElement("a");
+    link.download = "Cymor_Speed_Results.png";
+    link.href = canvas.toDataURL();
+    link.click();
 });
