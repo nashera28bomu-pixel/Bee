@@ -42,7 +42,7 @@ app.get("/ping", (req, res) => {
 
 app.get("/download", (req, res) => {
 
-    const totalSize = 25 * 1024 * 1024;
+    const totalSize = 100 * 1024 * 1024;
     const chunkSize = 256 * 1024;
 
     const chunk = Buffer.alloc(chunkSize, "A");
