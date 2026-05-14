@@ -1,64 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cymor Online Speed Test | Ultra-Fast Analytics</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Poppins:wght@300;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Cymor Internet Speed Test</title>
+
+<link rel="stylesheet" href="style.css">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
 </head>
+
 <body>
-    <div class="bg-elements" id="bgElements"></div>
-    <div class="glass-overlay"></div>
 
-    <div class="hero" id="hero">
-        <div class="brand-box">
-            <div class="logo-glow">⚡ Cymor Tech Services</div>
-            <h1 class="glitch-title">HYPER-SONIC <br><span>CONNECTIVITY</span></h1>
-            <p class="subtitle">Experience precision analytics in real-time.</p>
-        </div>
-        <button id="startBtn" class="pulse-btn">BEGIN SPEED ANALYSIS</button>
+<div class="bg"></div>
+
+<div class="hero" id="hero">
+
+    <div class="logo">
+        ⚡ Cymor Internet Speed Test
     </div>
 
-    <div class="test-screen hidden" id="testScreen">
-        <div class="top-bar">
-            <div class="mini-logo">CYMOR_OS_V2.0</div>
-            <div class="provider-pill" id="provider">Detecting Network...</div>
+    <h1>Test Your Internet Speed Now</h1>
+
+    <p class="subtitle">
+        Fast • Accurate • Real-Time Results
+    </p>
+
+    <button id="startBtn">
+        TEST YOUR INTERNET SPEED NOW
+    </button>
+
+</div>
+
+<div class="test-screen hidden" id="testScreen">
+
+    <div class="top-bar">
+
+        <div class="mini-logo">
+            ⚡ Cymor Speed Test
         </div>
 
-        <div class="speed-container">
-            <div class="main-display">
-                <span id="mainSpeed" class="glow-text">0</span>
-                <span class="unit">Mbps</span>
-            </div>
-            <div class="status-msg" id="status">Ready for Uplink...</div>
+        <div class="provider" id="provider">
+            Detecting ISP...
         </div>
 
-        <div class="graph-container">
-            <canvas id="speedChart"></canvas>
-        </div>
-
-        <div class="results-wrapper" id="resultCard">
-            <!-- Hidden header for screenshot -->
-            <div class="share-header">Cymor Online Speed Test Results</div>
-            
-            <h2>SYSTEM DATA REPORT</h2>
-            <div class="results-grid">
-                <div class="res-item"><span>DOWNLOAD</span><h3 id="download">0.0</h3></div>
-                <div class="res-item"><span>UPLOAD</span><h3 id="upload">0.0</h3></div>
-                <div class="res-item"><span>LATENCY</span><h3 id="ping">0ms</h3></div>
-            </div>
-            <button id="shareBtn">EXPORT ANALYTICS (PNG)</button>
-        </div>
     </div>
 
-    <footer>
-        <p>ENGINEERED BY THE LEGENDARY SMILEY CYMOR</p>
-        <span>© 2026 CYMORTECHSERVICES.</span>
-    </footer>
+    <div class="speed-area">
 
-    <script src="script.js"></script>
+        <div class="speed-value" id="mainSpeed">
+            0
+        </div>
+
+        <div class="speed-unit">
+            Mbps
+        </div>
+
+        <div class="status" id="status">
+            Initializing...
+        </div>
+
+    </div>
+
+    <div class="graph-box">
+
+        <canvas id="speedChart"></canvas>
+
+    </div>
+
+    <div class="results-card" id="resultCard">
+
+        <h2>🚀 YOUR INTERNET RESULTS</h2>
+
+        <div class="results-grid">
+
+            <div class="result-box">
+                <span>⬇ Download</span>
+                <h3 id="download">0 Mbps</h3>
+            </div>
+
+            <div class="result-box">
+                <span>⬆ Upload</span>
+                <h3 id="upload">0 Mbps</h3>
+            </div>
+
+            <div class="result-box">
+                <span>📶 Ping</span>
+                <h3 id="ping">0 ms</h3>
+            </div>
+
+            <div class="result-box">
+                <span>🌐 Provider</span>
+                <h3 id="providerName">Unknown</h3>
+            </div>
+
+        </div>
+
+        <button id="shareBtn">
+            SHARE RESULTS AS IMAGE
+        </button>
+
+    </div>
+
+</div>
+
+<footer>
+
+    Site made by the Legendary Smiley Cymor <br>
+    © CymorTechServices 2026
+
+</footer>
+
+<script src="script.js"></script>
+
 </body>
 </html>
