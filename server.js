@@ -1,5 +1,5 @@
 /**
- * Cymor Ultra Speed Test Engine - Backend
+ * Cymor Ultra Speed Test Engine - Backend (Nuclear Stability Version)
  * Powered by Cymor
  */
 
@@ -8,58 +8,63 @@ const compression = require("compression");
 const path = require("path");
 const EventEmitter = require('events');
 
-// 1. FIX: Increase listener limit globally to handle multiple concurrent test streams.
-// This prevents the 'MaxListenersExceededWarning' for Brotli/Gzip.
-EventEmitter.defaultMaxListeners = 50; 
+// Increase limit to 100 to provide a massive overhead buffer for concurrent streams
+EventEmitter.defaultMaxListeners = 100; 
 
 const app = express();
 
 /**
- * 2. OPTIMIZED COMPRESSION
- * We only compress static assets (HTML/CSS/JS). 
- * Speed test endpoints MUST be raw to measure actual network performance.
+ * 1. ANTI-COMPRESSION MIDDLEWARE
+ * This interceptor strips 'accept-encoding' headers for test routes.
+ * This effectively kills Brotli/Gzip listeners before they can be created.
  */
-const shouldCompress = (req, res) => {
-    // Disable compression for download and upload paths
-    if (req.url === "/download" || req.url === "/upload") {
-        return false;
+app.use((req, res, next) => {
+    if (req.url.startsWith("/download") || req.url.startsWith("/upload")) {
+        req.headers['accept-encoding'] = 'identity'; // Force raw network data
     }
-    // Fallback to standard compression filter
-    return compression.filter(req, res);
-};
+    next();
+});
 
-app.use(compression({ filter: shouldCompress }));
+/**
+ * 2. STATIC FILE COMPRESSION
+ * Standard compression is only applied to frontend assets (HTML/CSS/JS).
+ */
+app.use(compression({
+    filter: (req, res) => {
+        if (req.url.startsWith("/download") || req.url.startsWith("/upload")) {
+            return false;
+        }
+        return compression.filter(req, res);
+    }
+}));
+
 app.use(express.static(path.join(__dirname, "public")));
 
 /**
  * 3. PING ENDPOINT
- * Minimal overhead to measure pure latency.
  */
 app.get("/ping", (req, res) => {
-    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     res.status(200).send("ok");
 });
 
 /**
  * 4. DOWNLOAD ENDPOINT
- * Optimized for high-speed streaming with drain-awareness.
+ * High-speed binary streaming with strict identity encoding.
  */
 app.get("/download", (req, res) => {
     const totalSize = 50 * 1024 * 1024; // 50MB
-    const chunkSize = 64 * 1024; // 64KB chunks
+    const chunkSize = 64 * 1024;
     const chunk = Buffer.alloc(chunkSize, "A");
 
     res.writeHead(200, {
         "Content-Type": "application/octet-stream",
         "Content-Length": totalSize,
         "Cache-Control": "no-store",
-        "Content-Disposition": "attachment; filename=test.bin",
-        // Force no-compression header just in case
         "Content-Encoding": "identity" 
     });
 
     let sent = 0;
-    
     function write() {
         let ok = true;
         while (sent < totalSize && ok) {
@@ -70,23 +75,19 @@ app.get("/download", (req, res) => {
                 ok = res.write(chunk);
             }
         }
-        // If the buffer is full, wait for the 'drain' event to continue
         if (sent < totalSize) {
             res.once('drain', write);
         }
     }
-
     write();
 });
 
 /**
  * 5. UPLOAD ENDPOINT
- * Consumes the stream without memory bloat.
  */
 app.post("/upload", (req, res) => {
-    // Simply consume the data stream to allow the client to upload at max speed
     req.on("data", () => {
-        // Data is intentionally ignored to prevent RAM usage
+        // Data consumed but not stored to protect server RAM
     });
 
     req.on("end", () => {
@@ -105,10 +106,9 @@ app.post("/upload", (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`
-🚀 Cymor Ultra Speed Test Engine Active
+🚀 Cymor Engine: Nuclear Stability Active
 ---------------------------------------
-URL: http://localhost:${PORT}
-Mode: High-Precision Performance
+Compression: Restricted on Test Routes
 Max Listeners: ${EventEmitter.defaultMaxListeners}
     `);
 });
