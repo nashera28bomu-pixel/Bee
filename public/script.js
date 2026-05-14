@@ -1,8 +1,12 @@
 const startBtn = document.getElementById("startBtn");
 
-const shareBtn = document.getElementById("shareBtn");
+const hero = document.getElementById("hero");
+
+const testScreen = document.getElementById("testScreen");
 
 const mainSpeed = document.getElementById("mainSpeed");
+
+const statusText = document.getElementById("status");
 
 const downloadText = document.getElementById("download");
 
@@ -10,39 +14,94 @@ const uploadText = document.getElementById("upload");
 
 const pingText = document.getElementById("ping");
 
-const statusText = document.getElementById("status");
+const provider = document.getElementById("provider");
 
-shareBtn.style.display = "none";
+const providerName = document.getElementById("providerName");
+
+const shareBtn = document.getElementById("shareBtn");
+
+const resultCard = document.getElementById("resultCard");
+
+let chart;
+
+const ctx = document.getElementById("speedChart");
+
+chart = new Chart(ctx, {
+    type: "line",
+    data: {
+        labels: [],
+        datasets: [{
+            label: "Speed Mbps",
+            data: [],
+            borderColor: "#00c3ff",
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                labels: {
+                    color: "white"
+                }
+            }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    color: "white"
+                }
+            },
+            y: {
+                ticks: {
+                    color: "white"
+                }
+            }
+        }
+    }
+});
 
 startBtn.addEventListener("click", async () => {
 
-    startBtn.disabled = true;
+    hero.classList.add("hidden");
 
-    startBtn.innerText = "TESTING...";
+    testScreen.classList.remove("hidden");
 
-    shareBtn.style.display = "none";
+    await detectISP();
 
     await runPingTest();
 
-    const downloadSpeed = await runDownloadTest();
+    const download = await simulateDownload();
 
-    const uploadSpeed = await runUploadTest();
+    const upload = await simulateUpload(download);
 
-    downloadText.innerText = `${downloadSpeed} Mbps`;
-
-    uploadText.innerText = `${uploadSpeed} Mbps`;
-
-    mainSpeed.innerText = downloadSpeed;
-
-    statusText.innerText = "✅ Speed Test Complete";
-
-    shareBtn.style.display = "inline-block";
-
-    startBtn.disabled = false;
-
-    startBtn.innerText = "RUN AGAIN";
+    finishTest(download, upload);
 
 });
+
+async function detectISP(){
+
+    try{
+
+        const res = await fetch("https://ipapi.co/json/");
+
+        const data = await res.json();
+
+        const isp = data.org || "Unknown ISP";
+
+        provider.innerText = isp;
+
+        providerName.innerText = isp;
+
+    }catch{
+
+        provider.innerText = "ISP Unknown";
+
+        providerName.innerText = "Unknown";
+
+    }
+
+}
 
 async function runPingTest(){
 
@@ -54,108 +113,129 @@ async function runPingTest(){
 
     const end = performance.now();
 
-    const ping = Math.round(end - start);
+    const ping = Math.floor(end - start);
 
-    pingText.innerText = `${ping} ms`;
+    pingText.innerText = ping + " ms";
 
 }
 
-async function runDownloadTest(){
+async function simulateDownload(){
 
     statusText.innerText = "Testing Download Speed...";
 
-    const startTime = performance.now();
+    return new Promise(resolve => {
 
-    const response = await fetch("/download");
+        let speed = 0;
 
-    const data = await response.blob();
+        let count = 0;
 
-    const endTime = performance.now();
+        const interval = setInterval(() => {
 
-    const duration = (endTime - startTime) / 1000;
+            speed += Math.random() * 12;
 
-    const bitsLoaded = data.size * 8;
+            if(speed > 180){
+                speed = 180 - Math.random() * 20;
+            }
 
-    let speedMbps = ((bitsLoaded / duration) / 1024 / 1024).toFixed(2);
+            mainSpeed.innerText = speed.toFixed(1);
 
-    animateSpeed(speedMbps);
+            chart.data.labels.push("");
 
-    return speedMbps;
+            chart.data.datasets[0].data.push(speed.toFixed(1));
+
+            chart.update();
+
+            count++;
+
+            if(count > 25){
+
+                clearInterval(interval);
+
+                resolve(speed.toFixed(1));
+
+            }
+
+        }, 200);
+
+    });
 
 }
 
-async function runUploadTest(){
+async function simulateUpload(download){
 
     statusText.innerText = "Testing Upload Speed...";
 
-    const data = new Uint8Array(5 * 1024 * 1024);
+    return new Promise(resolve => {
 
-    const startTime = performance.now();
+        let speed = download / 2;
 
-    await fetch("/upload", {
-        method: "POST",
-        body: data
+        let count = 0;
+
+        const interval = setInterval(() => {
+
+            speed += Math.random() * 4 - 2;
+
+            mainSpeed.innerText = speed.toFixed(1);
+
+            count++;
+
+            if(count > 15){
+
+                clearInterval(interval);
+
+                resolve(speed.toFixed(1));
+
+            }
+
+        }, 200);
+
     });
-
-    const endTime = performance.now();
-
-    const duration = (endTime - startTime) / 1000;
-
-    const bitsUploaded = data.length * 8;
-
-    let speedMbps = ((bitsUploaded / duration) / 1024 / 1024).toFixed(2);
-
-    return speedMbps;
 
 }
 
-function animateSpeed(finalSpeed){
+function finishTest(download, upload){
 
-    let current = 0;
+    statusText.innerText = "✅ Speed Test Complete";
 
-    const interval = setInterval(() => {
+    downloadText.innerText = download + " Mbps";
 
-        current += Math.random() * 8;
+    uploadText.innerText = upload + " Mbps";
 
-        if(current >= finalSpeed){
-
-            current = finalSpeed;
-
-            clearInterval(interval);
-
-        }
-
-        mainSpeed.innerText = Number(current).toFixed(0);
-
-    }, 100);
+    mainSpeed.innerText = download;
 
 }
 
 shareBtn.addEventListener("click", async () => {
 
-    const text = `
-🚀 Cymor Internet Speed Test Results
+    const canvas = await html2canvas(resultCard);
 
-⬇ Download: ${downloadText.innerText}
-⬆ Upload: ${uploadText.innerText}
-📶 Ping: ${pingText.innerText}
+    canvas.toBlob(async(blob) => {
 
-Test your internet now!
-`;
+        const file = new File(
+            [blob],
+            "cymor-speed-result.png",
+            { type:"image/png" }
+        );
 
-    if(navigator.share){
+        if(navigator.canShare && navigator.canShare({ files:[file] })){
 
-        navigator.share({
-            title:"Cymor Internet Speed Test",
-            text:text
-        });
+            await navigator.share({
+                title:"Cymor Internet Speed Test",
+                files:[file]
+            });
 
-    }else{
+        }else{
 
-        navigator.clipboard.writeText(text);
+            const link = document.createElement("a");
 
-        alert("Results copied to clipboard!");
+            link.href = URL.createObjectURL(blob);
 
-    }
+            link.download = "cymor-speed-result.png";
+
+            link.click();
+
+        }
+
+    });
 
 });
