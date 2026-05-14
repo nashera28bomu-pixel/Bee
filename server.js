@@ -27,10 +27,7 @@ app.use(
                 return false;
             }
 
-            return compression.filter(
-                req,
-                res
-            );
+            return compression.filter(req, res);
         }
     })
 );
@@ -53,98 +50,76 @@ app.get("/ping", (req, res) => {
 
     res.set({
 
-        "Cache-Control":
-        "no-store",
-
-        "Access-Control-Allow-Origin":
-        "*"
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*"
     });
 
     res.send("pong");
 });
 
 /* =========================================
-   DOWNLOAD TEST ROUTE
+   STABLE DOWNLOAD TEST ROUTE
 ========================================= */
 
-app.get("/download", (req, res) => {
+app.get("/download", async (req, res) => {
 
-    // 1GB virtual stream
-    const totalSize =
-    1024 * 1024 * 1024;
-
-    // 256KB chunks
-    const chunkSize =
-    256 * 1024;
-
-    const chunk =
-    Buffer.alloc(chunkSize, "A");
+    const chunkSize = 64 * 1024; // 64KB
+    const duration = 12000; // 12 seconds
+    const endTime = Date.now() + duration;
 
     res.writeHead(200, {
 
-        "Content-Type":
-        "application/octet-stream",
+        "Content-Type": "application/octet-stream",
 
-        "Cache-Control":
-        "no-store, no-cache, must-revalidate",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
 
-        "Pragma":
-        "no-cache",
+        "Pragma": "no-cache",
 
-        "Expires":
-        "0",
+        "Expires": "0",
 
-        "Content-Encoding":
-        "identity",
+        "Content-Encoding": "identity",
 
-        "Access-Control-Allow-Origin":
-        "*",
+        "Access-Control-Allow-Origin": "*",
 
-        "Connection":
-        "keep-alive"
+        "Connection": "keep-alive"
     });
 
-    let sent = 0;
+    const chunk = Buffer.alloc(chunkSize);
+
     let closed = false;
 
     req.on("close", () => {
 
         closed = true;
 
-        try{
+        try {
             res.end();
         } catch {}
     });
 
-    function sendChunk(){
+    async function stream() {
 
-        if(closed) return;
+        while (
+            !closed &&
+            Date.now() < endTime
+        ) {
 
-        while(sent < totalSize){
+            const ok = res.write(chunk);
 
-            const ok =
-            res.write(chunk);
+            if (!ok) {
 
-            sent += chunk.length;
-
-            if(!ok){
-
-                res.once(
-                    "drain",
-                    sendChunk
+                await new Promise(resolve =>
+                    res.once("drain", resolve)
                 );
-
-                return;
             }
         }
 
-        if(!closed){
-
+        if (!closed) {
             res.end();
         }
     }
 
-    sendChunk();
+    stream();
 });
 
 /* =========================================
@@ -152,38 +127,29 @@ app.get("/download", (req, res) => {
 ========================================= */
 
 app.post(
+    "/upload",
+    express.raw({
+        type: "*/*",
+        limit: "50mb"
+    }),
+    (req, res) => {
 
-"/upload",
+        res.set({
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*"
+        });
 
-express.raw({
-
-    type: "*/*",
-
-    limit: "50mb"
-}),
-
-(req, res) => {
-
-    res.set({
-
-        "Cache-Control":
-        "no-store",
-
-        "Access-Control-Allow-Origin":
-        "*"
-    });
-
-    res.json({
-        success: true
-    });
-});
+        res.json({
+            success: true
+        });
+    }
+);
 
 /* =========================================
    START SERVER
 ========================================= */
 
-const PORT =
-process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
 
