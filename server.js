@@ -1,49 +1,65 @@
+/**
+ * Cymor Ultra Speed Test Engine - Backend
+ * Powered by Cymor
+ */
+
 const express = require("express");
 const compression = require("compression");
 const path = require("path");
+const EventEmitter = require('events');
+
+// 1. FIX: Increase listener limit globally to handle multiple concurrent test streams.
+// This prevents the 'MaxListenersExceededWarning' for Brotli/Gzip.
+EventEmitter.defaultMaxListeners = 50; 
 
 const app = express();
 
-// Disable compression for speed test endpoints to get raw network performance
-// We only want compression on the static frontend files
-app.use((req, res, next) => {
+/**
+ * 2. OPTIMIZED COMPRESSION
+ * We only compress static assets (HTML/CSS/JS). 
+ * Speed test endpoints MUST be raw to measure actual network performance.
+ */
+const shouldCompress = (req, res) => {
+    // Disable compression for download and upload paths
     if (req.url === "/download" || req.url === "/upload") {
-        return next();
+        return false;
     }
-    compression()(req, res, next);
-});
+    // Fallback to standard compression filter
+    return compression.filter(req, res);
+};
 
+app.use(compression({ filter: shouldCompress }));
 app.use(express.static(path.join(__dirname, "public")));
 
 /**
- * 1. PING ENDPOINT
+ * 3. PING ENDPOINT
  * Minimal overhead to measure pure latency.
  */
 app.get("/ping", (req, res) => {
-    res.set("Cache-Control", "no-store");
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.status(200).send("ok");
 });
 
 /**
- * 2. DOWNLOAD ENDPOINT
- * Optimized for high-speed streaming without artificial delays.
+ * 4. DOWNLOAD ENDPOINT
+ * Optimized for high-speed streaming with drain-awareness.
  */
 app.get("/download", (req, res) => {
-    // Increase size to 50MB to ensure high-speed connections don't finish too early
-    const totalSize = 50 * 1024 * 1024; 
-    const chunkSize = 64 * 1024; // 64KB chunks are efficient for Node.js
+    const totalSize = 50 * 1024 * 1024; // 50MB
+    const chunkSize = 64 * 1024; // 64KB chunks
     const chunk = Buffer.alloc(chunkSize, "A");
 
     res.writeHead(200, {
         "Content-Type": "application/octet-stream",
         "Content-Length": totalSize,
         "Cache-Control": "no-store",
-        "Content-Disposition": "attachment; filename=test.bin"
+        "Content-Disposition": "attachment; filename=test.bin",
+        // Force no-compression header just in case
+        "Content-Encoding": "identity" 
     });
 
     let sent = 0;
     
-    // Use a drain-aware stream to prevent memory bloat on the server
     function write() {
         let ok = true;
         while (sent < totalSize && ok) {
@@ -54,6 +70,7 @@ app.get("/download", (req, res) => {
                 ok = res.write(chunk);
             }
         }
+        // If the buffer is full, wait for the 'drain' event to continue
         if (sent < totalSize) {
             res.once('drain', write);
         }
@@ -63,25 +80,25 @@ app.get("/download", (req, res) => {
 });
 
 /**
- * 3. UPLOAD ENDPOINT
- * Efficiently consumes the stream without storing it in memory.
- * This is crucial for preventing "Out of Memory" errors on large tests.
+ * 5. UPLOAD ENDPOINT
+ * Consumes the stream without memory bloat.
  */
 app.post("/upload", (req, res) => {
-    // We don't use express.raw() here because it loads the whole thing into RAM.
-    // Instead, we just pipe the incoming data to "null" (nowhere).
-    req.on("data", (chunk) => {
-        // Just consuming the data to keep the socket open and moving
+    // Simply consume the data stream to allow the client to upload at max speed
+    req.on("data", () => {
+        // Data is intentionally ignored to prevent RAM usage
     });
 
     req.on("end", () => {
         res.set("Cache-Control", "no-store");
-        res.json({ success: true });
+        res.status(200).json({ success: true });
     });
 
     req.on("error", (err) => {
-        console.error("Upload error:", err);
-        res.status(500).send("Upload failed");
+        console.error("Upload stream error:", err);
+        if (!res.headersSent) {
+            res.status(500).send("Upload failed");
+        }
     });
 });
 
@@ -92,5 +109,6 @@ app.listen(PORT, () => {
 ---------------------------------------
 URL: http://localhost:${PORT}
 Mode: High-Precision Performance
+Max Listeners: ${EventEmitter.defaultMaxListeners}
     `);
 });
