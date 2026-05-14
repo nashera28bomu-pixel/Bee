@@ -7,13 +7,13 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Cymor Internet Speed Test</title>
+<title>Cymor Online Speed Test</title>
 
 <link rel="stylesheet" href="style.css">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -25,30 +25,38 @@
 
 <div class="bg"></div>
 
-<div class="hero" id="hero">
+<div class="bg-elements" id="bgElements"></div>
 
-    <div class="logo">
-        ⚡ Cymor Internet Speed Test
+<section class="hero" id="hero">
+
+    <div>
+
+        <div class="logo">
+            ⚡ Cymor Online Speed Test
+        </div>
+
+        <h1>
+            EXPERIENCE REAL INTERNET SPEED TESTING
+        </h1>
+
+        <p class="subtitle">
+            Live Mbps Tracking • ISP Detection • Share Results
+        </p>
+
     </div>
-
-    <h1>Test Your Internet Speed Now</h1>
-
-    <p class="subtitle">
-        Fast • Accurate • Real-Time Results
-    </p>
 
     <button id="startBtn">
         TEST YOUR INTERNET SPEED NOW
     </button>
 
-</div>
+</section>
 
-<div class="test-screen hidden" id="testScreen">
+<section class="test-screen hidden" id="testScreen">
 
     <div class="top-bar">
 
         <div class="mini-logo">
-            ⚡ Cymor Speed Test
+            ⚡ Cymor Online Speed Test
         </div>
 
         <div class="provider" id="provider">
@@ -68,7 +76,7 @@
         </div>
 
         <div class="status" id="status">
-            Initializing...
+            Preparing Test...
         </div>
 
     </div>
@@ -81,27 +89,33 @@
 
     <div class="results-card" id="resultCard">
 
-        <h2>🚀 YOUR INTERNET RESULTS</h2>
+        <div class="share-title">
+            ⚡ Cymor Online Speed Test
+        </div>
+
+        <h2>
+            YOUR INTERNET RESULTS
+        </h2>
 
         <div class="results-grid">
 
             <div class="result-box">
-                <span>⬇ Download</span>
+                <span>⬇ DOWNLOAD</span>
                 <h3 id="download">0 Mbps</h3>
             </div>
 
             <div class="result-box">
-                <span>⬆ Upload</span>
+                <span>⬆ UPLOAD</span>
                 <h3 id="upload">0 Mbps</h3>
             </div>
 
             <div class="result-box">
-                <span>📶 Ping</span>
+                <span>📶 PING</span>
                 <h3 id="ping">0 ms</h3>
             </div>
 
             <div class="result-box">
-                <span>🌐 Provider</span>
+                <span>🌐 PROVIDER</span>
                 <h3 id="providerName">Unknown</h3>
             </div>
 
@@ -113,7 +127,7 @@
 
     </div>
 
-</div>
+</section>
 
 <footer>
 
