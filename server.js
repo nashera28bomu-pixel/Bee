@@ -5,118 +5,189 @@ const path = require("path");
 
 const app = express();
 
+/* =========================================
+   CORS
+========================================= */
+
 app.use(cors());
 
-app.use(compression({
-    filter: (req, res) => {
-        if (
-            req.url.startsWith("/download") ||
-            req.url.startsWith("/upload")
-        ) {
-            return false;
+/* =========================================
+   COMPRESSION
+   Disable compression for speed routes
+========================================= */
+
+app.use(
+    compression({
+        filter: (req, res) => {
+
+            if (
+                req.url.startsWith("/download") ||
+                req.url.startsWith("/upload")
+            ) {
+                return false;
+            }
+
+            return compression.filter(
+                req,
+                res
+            );
         }
+    })
+);
 
-        return compression.filter(req, res);
-    }
-}));
+/* =========================================
+   STATIC FILES
+========================================= */
 
-app.use(express.static(path.join(__dirname, "public")));
+app.use(
+    express.static(
+        path.join(__dirname, "public")
+    )
+);
 
-/* ======================
-   PING
-====================== */
+/* =========================================
+   PING ROUTE
+========================================= */
 
 app.get("/ping", (req, res) => {
 
     res.set({
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*"
+
+        "Cache-Control":
+        "no-store",
+
+        "Access-Control-Allow-Origin":
+        "*"
     });
 
     res.send("pong");
 });
 
-/* ======================
-   DOWNLOAD TEST
-====================== */
+/* =========================================
+   DOWNLOAD TEST ROUTE
+========================================= */
 
 app.get("/download", (req, res) => {
 
-    const totalSize = 100 * 1024 * 1024;
-    const chunkSize = 256 * 1024;
+    // 1GB virtual stream
+    const totalSize =
+    1024 * 1024 * 1024;
 
-    const chunk = Buffer.alloc(chunkSize, "A");
+    // 256KB chunks
+    const chunkSize =
+    256 * 1024;
+
+    const chunk =
+    Buffer.alloc(chunkSize, "A");
 
     res.writeHead(200, {
-        "Content-Type": "application/octet-stream",
-        "Content-Length": totalSize,
-        "Cache-Control": "no-store",
-        "Content-Encoding": "identity",
-        "Access-Control-Allow-Origin": "*"
+
+        "Content-Type":
+        "application/octet-stream",
+
+        "Cache-Control":
+        "no-store, no-cache, must-revalidate",
+
+        "Pragma":
+        "no-cache",
+
+        "Expires":
+        "0",
+
+        "Content-Encoding":
+        "identity",
+
+        "Access-Control-Allow-Origin":
+        "*",
+
+        "Connection":
+        "keep-alive"
     });
 
     let sent = 0;
+    let closed = false;
 
-    function sendChunk() {
+    req.on("close", () => {
 
-        while (sent < totalSize) {
+        closed = true;
 
-            const remaining = totalSize - sent;
+        try{
+            res.end();
+        } catch {}
+    });
 
-            const size =
-                remaining >= chunkSize
-                ? chunkSize
-                : remaining;
+    function sendChunk(){
 
-            const canContinue =
-                res.write(chunk.slice(0, size));
+        if(closed) return;
 
-            sent += size;
+        while(sent < totalSize){
 
-            if (!canContinue) {
-                res.once("drain", sendChunk);
+            const ok =
+            res.write(chunk);
+
+            sent += chunk.length;
+
+            if(!ok){
+
+                res.once(
+                    "drain",
+                    sendChunk
+                );
+
                 return;
             }
         }
 
-        res.end();
+        if(!closed){
+
+            res.end();
+        }
     }
 
     sendChunk();
 });
 
-/* ======================
-   UPLOAD TEST
-====================== */
+/* =========================================
+   UPLOAD TEST ROUTE
+========================================= */
 
 app.post(
-    "/upload",
-    express.raw({
-        limit: "20mb",
-        type: "*/*"
-    }),
-    (req, res) => {
 
-        res.set({
-            "Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*"
-        });
+"/upload",
 
-        res.json({
-            success: true
-        });
-    }
-);
+express.raw({
 
-/* ======================
+    type: "*/*",
+
+    limit: "50mb"
+}),
+
+(req, res) => {
+
+    res.set({
+
+        "Cache-Control":
+        "no-store",
+
+        "Access-Control-Allow-Origin":
+        "*"
+    });
+
+    res.json({
+        success: true
+    });
+});
+
+/* =========================================
    START SERVER
-====================== */
+========================================= */
 
-const PORT = process.env.PORT || 3000;
+const PORT =
+process.env.PORT || 3000;
 
 app.listen(PORT, () => {
 
     console.log(
-        `🚀 Cymor Speed Test running on ${PORT}`
+        `🚀 Cymor Speed Test running on port ${PORT}`
     );
 });
