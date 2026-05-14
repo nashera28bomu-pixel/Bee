@@ -23,7 +23,8 @@ const ctx = document.getElementById("gauge").getContext("2d");
 /* ======================
    SETTINGS & STATE
 ====================== */
-let STREAMS = 4;
+// Reduced from 4 to 2 for stability on Render Free tier to prevent Brotli memory leaks
+let STREAMS = 2; 
 let speedSamples = [];
 
 /* ======================
@@ -254,6 +255,9 @@ function finishTest(download, upload) {
     notifyDone(download, upload);
 }
 
+/* ======================
+   START TEST FLOW
+====================== */
 startBtn.addEventListener("click", async () => {
     try {
         startBtn.disabled = true;
@@ -268,11 +272,15 @@ startBtn.addEventListener("click", async () => {
         await detectISP();
         await runPingTest();
 
+        // 1. Download Phase
         const download = await realDownloadTest();
         
+        // 2. Cooldown Phase
+        // IMPORTANT: Increase delay to 1.5s to let the server clear Brotli streams
         updateSpeed(0); 
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 1500));
 
+        // 3. Upload Phase
         const upload = await realUploadTest();
 
         finishTest(download, upload);
