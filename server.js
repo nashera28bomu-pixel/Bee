@@ -5,37 +5,61 @@ const path = require("path");
 const app = express();
 
 app.use(compression());
+
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/ping", (req, res) => {
-  res.send("pong");
+    res.send("pong");
 });
 
-// Download test route
 app.get("/download", (req, res) => {
-  const size = 20 * 1024 * 1024; // 20MB
 
-  const buffer = Buffer.alloc(size, "C");
+    const size = 25 * 1024 * 1024;
 
-  res.set({
-    "Content-Type": "application/octet-stream",
-    "Content-Length": size,
-    "Cache-Control": "no-cache"
-  });
+    res.writeHead(200, {
+        "Content-Type": "application/octet-stream",
+        "Content-Length": size,
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+    });
 
-  res.send(buffer);
+    const chunk = Buffer.alloc(1024 * 256, "X");
+
+    let sent = 0;
+
+    const interval = setInterval(() => {
+
+        if(sent >= size){
+
+            clearInterval(interval);
+
+            return res.end();
+
+        }
+
+        res.write(chunk);
+
+        sent += chunk.length;
+
+    }, 1);
+
 });
 
-// Upload test route
-app.post("/upload", express.raw({ limit: "50mb", type: "*/*" }), (req, res) => {
-  res.json({
-    success: true,
-    received: req.body.length
-  });
+app.post("/upload",
+express.raw({
+    limit:"50mb",
+    type:"*/*"
+}),
+(req,res)=>{
+
+    res.json({
+        success:true
+    });
+
 });
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Cymor Speed Test running on port ${PORT}`);
+    console.log(`🚀 Cymor Speed Test running on ${PORT}`);
 });
