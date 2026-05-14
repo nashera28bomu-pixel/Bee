@@ -4,7 +4,6 @@
 <head>
 
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Cymor Online Speed Test</title>
@@ -12,11 +11,9 @@
 <link rel="stylesheet" href="style.css">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
 </head>
@@ -24,9 +21,9 @@
 <body>
 
 <div class="bg"></div>
-
 <div class="bg-elements" id="bgElements"></div>
 
+<!-- ================= HERO ================= -->
 <section class="hero" id="hero">
 
     <div>
@@ -51,12 +48,13 @@
 
 </section>
 
+<!-- ================= TEST SCREEN ================= -->
 <section class="test-screen hidden" id="testScreen">
 
     <div class="top-bar">
 
         <div class="mini-logo">
-            ⚡ Cymor Online Speed Test
+            ⚡ Cymor Speed Test
         </div>
 
         <div class="provider" id="provider">
@@ -65,14 +63,25 @@
 
     </div>
 
+    <!-- ================= SPEED GAUGE (NEW PRO ADDITION) ================= -->
     <div class="speed-area">
 
-        <div class="speed-value" id="mainSpeed">
-            0
-        </div>
+        <div class="speed-circle">
 
-        <div class="speed-unit">
-            Mbps
+            <canvas id="gauge" width="260" height="260"></canvas>
+
+            <div style="position:absolute;text-align:center;">
+
+                <div class="speed-value" id="mainSpeed">
+                    0
+                </div>
+
+                <div class="speed-unit">
+                    Mbps
+                </div>
+
+            </div>
+
         </div>
 
         <div class="status" id="status">
@@ -81,12 +90,12 @@
 
     </div>
 
+    <!-- ================= LIVE GRAPH ================= -->
     <div class="graph-box">
-
         <canvas id="speedChart"></canvas>
-
     </div>
 
+    <!-- ================= RESULTS CARD ================= -->
     <div class="results-card" id="resultCard">
 
         <div class="share-title">
@@ -121,7 +130,8 @@
 
         </div>
 
-        <button id="shareBtn">
+        <!-- ================= SHARE BUTTON (HIDDEN INITIALLY) ================= -->
+        <button id="shareBtn" class="hidden">
             SHARE RESULTS AS IMAGE
         </button>
 
@@ -129,6 +139,7 @@
 
 </section>
 
+<!-- ================= FOOTER ================= -->
 <footer>
 
     Site made by the Legendary Smiley Cymor <br>
