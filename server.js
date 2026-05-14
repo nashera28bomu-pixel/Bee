@@ -1,22 +1,29 @@
-/**
- * Cymor Ultra Speed Test Engine - Backend (Nuclear Stability Version)
+/** 
+ * Cymor Ultra Speed Test Engine - Backend 
+ * Compatibility Patch v2 + Nuclear Stability
  * Powered by Cymor
  */
-
 const express = require("express");
 const compression = require("compression");
+const cors = require("cors"); 
 const path = require("path");
 const EventEmitter = require('events');
 
-// Increase limit to 100 to provide a massive overhead buffer for concurrent streams
+// Provide a massive overhead buffer for concurrent streams
 EventEmitter.defaultMaxListeners = 100; 
 
 const app = express();
 
 /**
- * 1. ANTI-COMPRESSION MIDDLEWARE
- * This interceptor strips 'accept-encoding' headers for test routes.
- * This effectively kills Brotli/Gzip listeners before they can be created.
+ * 1. CORS & PRE-FLIGHT
+ * Ensures the browser doesn't block the high-volume binary stream.
+ */
+app.use(cors());
+
+/**
+ * 2. ANTI-COMPRESSION MIDDLEWARE
+ * Intercepts and strips 'accept-encoding' headers for test routes.
+ * This prevents Brotli/Gzip listeners from leaking on the server.
  */
 app.use((req, res, next) => {
     if (req.url.startsWith("/download") || req.url.startsWith("/upload")) {
@@ -26,7 +33,7 @@ app.use((req, res, next) => {
 });
 
 /**
- * 2. STATIC FILE COMPRESSION
+ * 3. STATIC FILE COMPRESSION
  * Standard compression is only applied to frontend assets (HTML/CSS/JS).
  */
 app.use(compression({
@@ -41,16 +48,20 @@ app.use(compression({
 app.use(express.static(path.join(__dirname, "public")));
 
 /**
- * 3. PING ENDPOINT
+ * 4. PING ENDPOINT
  */
 app.get("/ping", (req, res) => {
-    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.set({
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "Access-Control-Allow-Origin": "*"
+    });
     res.status(200).send("ok");
 });
 
 /**
- * 4. DOWNLOAD ENDPOINT
- * High-speed binary streaming with strict identity encoding.
+ * 5. DOWNLOAD ENDPOINT
+ * High-speed binary streaming with strict identity encoding and 'nosniff' 
+ * to prevent browser buffering/guessing.
  */
 app.get("/download", (req, res) => {
     const totalSize = 50 * 1024 * 1024; // 50MB
@@ -61,7 +72,9 @@ app.get("/download", (req, res) => {
         "Content-Type": "application/octet-stream",
         "Content-Length": totalSize,
         "Cache-Control": "no-store",
-        "Content-Encoding": "identity" 
+        "Content-Encoding": "identity",
+        "X-Content-Type-Options": "nosniff", 
+        "Access-Control-Allow-Origin": "*"
     });
 
     let sent = 0;
@@ -83,7 +96,7 @@ app.get("/download", (req, res) => {
 });
 
 /**
- * 5. UPLOAD ENDPOINT
+ * 6. UPLOAD ENDPOINT
  */
 app.post("/upload", (req, res) => {
     req.on("data", () => {
@@ -91,7 +104,10 @@ app.post("/upload", (req, res) => {
     });
 
     req.on("end", () => {
-        res.set("Cache-Control", "no-store");
+        res.set({
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*"
+        });
         res.status(200).json({ success: true });
     });
 
@@ -106,8 +122,9 @@ app.post("/upload", (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`
-🚀 Cymor Engine: Nuclear Stability Active
+🚀 Cymor Engine: Nuclear Compatibility Active
 ---------------------------------------
+URL: http://localhost:${PORT}
 Compression: Restricted on Test Routes
 Max Listeners: ${EventEmitter.defaultMaxListeners}
     `);
