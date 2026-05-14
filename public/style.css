@@ -1,3 +1,8 @@
+:root{
+    --blue:#00c3ff;
+    --purple:#8f00ff;
+}
+
 *{
     margin:0;
     padding:0;
@@ -5,9 +10,9 @@
 }
 
 body{
-    font-family:'Poppins',sans-serif;
     background:#020617;
     color:white;
+    font-family:'Poppins',sans-serif;
     overflow-x:hidden;
 }
 
@@ -15,55 +20,122 @@ body{
     position:fixed;
     inset:0;
     background:
-    radial-gradient(circle at top left,#00c3ff33,transparent 35%),
+    radial-gradient(circle at top left,#00c3ff22,transparent 35%),
     radial-gradient(circle at bottom right,#8f00ff33,transparent 35%);
+    z-index:-2;
+}
+
+.bg-elements{
+    position:fixed;
+    inset:0;
+    overflow:hidden;
+    pointer-events:none;
     z-index:-1;
+}
+
+.floating-char{
+    position:absolute;
+    bottom:-100px;
+    color:rgba(0,195,255,0.12);
+    font-weight:700;
+    text-shadow:0 0 20px var(--blue);
+    animation:floatUp linear infinite;
+}
+
+@keyframes floatUp{
+
+    from{
+        transform:
+        translateY(0)
+        rotate(0deg);
+
+        opacity:0;
+    }
+
+    30%{
+        opacity:1;
+    }
+
+    to{
+        transform:
+        translateY(-120vh)
+        rotate(360deg);
+
+        opacity:0;
+    }
+
 }
 
 .hero{
     min-height:100vh;
     display:flex;
     flex-direction:column;
-    justify-content:center;
+    justify-content:space-between;
     align-items:center;
     text-align:center;
-    padding:20px;
+    padding:100px 20px 60px;
 }
 
 .logo{
-    font-size:2.2rem;
-    font-weight:700;
-    color:#00c3ff;
-    margin-bottom:20px;
+    font-size:3rem;
+    font-weight:900;
+    font-family:'Orbitron',sans-serif;
+    color:var(--blue);
+    text-shadow:0 0 25px var(--blue);
+    margin-bottom:30px;
 }
 
 h1{
-    font-size:3rem;
-    margin-bottom:15px;
+    font-size:4rem;
+    max-width:1000px;
+    margin:auto;
+    line-height:1.2;
+    text-shadow:0 0 30px rgba(255,255,255,0.2);
 }
 
 .subtitle{
+    margin-top:25px;
     color:#aaa;
-    margin-bottom:40px;
+    font-size:1.1rem;
 }
 
 #startBtn,
 #shareBtn{
     border:none;
-    padding:18px 35px;
-    border-radius:50px;
-    background:linear-gradient(45deg,#00c3ff,#8f00ff);
+    outline:none;
+    background:
+    linear-gradient(
+    45deg,
+    var(--blue),
+    var(--purple)
+    );
+
     color:white;
+
+    padding:20px 40px;
+
+    border-radius:60px;
+
     font-weight:700;
-    font-size:1rem;
+
     cursor:pointer;
+
+    font-size:1rem;
+
     transition:0.3s;
-    box-shadow:0 0 25px #00c3ff88;
+
+    box-shadow:
+    0 0 25px rgba(0,195,255,0.5);
 }
 
 #startBtn:hover,
 #shareBtn:hover{
+
     transform:scale(1.05);
+
+    box-shadow:
+    0 0 40px rgba(0,195,255,0.9);
+
 }
 
 .hidden{
@@ -83,12 +155,12 @@ h1{
 }
 
 .mini-logo{
-    color:#00c3ff;
+    color:var(--blue);
     font-weight:700;
 }
 
 .provider{
-    color:#ccc;
+    color:#bbb;
 }
 
 .speed-area{
@@ -97,8 +169,10 @@ h1{
 }
 
 .speed-value{
-    font-size:8rem;
-    font-weight:700;
+    font-size:9rem;
+    font-family:'Orbitron',sans-serif;
+    font-weight:900;
+    text-shadow:0 0 30px var(--blue);
 }
 
 .speed-unit{
@@ -108,7 +182,7 @@ h1{
 
 .status{
     margin-top:20px;
-    color:#00c3ff;
+    color:var(--blue);
     font-size:1.2rem;
 }
 
@@ -116,37 +190,49 @@ h1{
     width:100%;
     max-width:900px;
     margin:50px auto;
-    background:rgba(255,255,255,0.05);
-    border-radius:25px;
-    padding:20px;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.05);
+    padding:25px;
+    border-radius:30px;
+    backdrop-filter:blur(15px);
 }
 
 .results-card{
     max-width:1000px;
     margin:50px auto;
     background:rgba(255,255,255,0.05);
-    border:1px solid rgba(255,255,255,0.1);
-    padding:30px;
-    border-radius:30px;
-    backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:35px;
+    padding:35px;
+    backdrop-filter:blur(15px);
+}
+
+.share-title{
+    text-align:center;
+    color:var(--blue);
+    font-family:'Orbitron',sans-serif;
+    margin-bottom:20px;
+    font-size:1.2rem;
 }
 
 .results-card h2{
     text-align:center;
-    margin-bottom:30px;
-    color:#00c3ff;
+    margin-bottom:35px;
 }
 
 .results-grid{
     display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    grid-template-columns:
+    repeat(auto-fit,minmax(220px,1fr));
+
     gap:20px;
 }
 
 .result-box{
-    background:#081226;
+    background:#071121;
+    border:1px solid rgba(255,255,255,0.05);
+    border-radius:25px;
     padding:25px;
-    border-radius:20px;
     text-align:center;
 }
 
@@ -156,25 +242,30 @@ h1{
 }
 
 .result-box h3{
-    font-size:2rem;
     margin-top:10px;
+    font-size:2rem;
 }
 
 #shareBtn{
-    margin-top:35px;
     width:100%;
+    margin-top:35px;
 }
 
 footer{
     text-align:center;
-    color:#888;
+    color:#777;
     padding:40px 20px;
+    line-height:1.8;
 }
 
 @media(max-width:768px){
 
-    h1{
+    .logo{
         font-size:2rem;
+    }
+
+    h1{
+        font-size:2.2rem;
     }
 
     .speed-value{
