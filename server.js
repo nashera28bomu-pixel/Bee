@@ -5,155 +5,90 @@ const path = require("path");
 
 const app = express();
 
-/* =========================================
-   CORS
-========================================= */
-
+/* CORS */
 app.use(cors());
 
-/* =========================================
-   COMPRESSION
-   Disable compression for speed routes
-========================================= */
-
+/* Compression - skip for test routes */
 app.use(
     compression({
         filter: (req, res) => {
-
-            if (
-                req.url.startsWith("/download") ||
-                req.url.startsWith("/upload")
-            ) {
+            if (req.url.startsWith("/download") || req.url.startsWith("/upload")) {
                 return false;
             }
-
             return compression.filter(req, res);
         }
     })
 );
 
-/* =========================================
-   STATIC FILES
-========================================= */
+/* Static files */
+app.use(express.static(path.join(__dirname, "public")));
 
-app.use(
-    express.static(
-        path.join(__dirname, "public")
-    )
-);
-
-/* =========================================
-   PING ROUTE
-========================================= */
-
+/* Ping */
 app.get("/ping", (req, res) => {
-
     res.set({
-
         "Cache-Control": "no-store",
         "Access-Control-Allow-Origin": "*"
     });
-
     res.send("pong");
 });
 
-/* =========================================
-   STABLE DOWNLOAD TEST ROUTE
-========================================= */
-
-app.get("/download", async (req, res) => {
-
+/* Download - shorter duration, more stable streaming */
+app.get("/download", (req, res) => {
     const chunkSize = 64 * 1024; // 64KB
-    const duration = 12000; // 12 seconds
+    const duration = 8000;       // 8 seconds
     const endTime = Date.now() + duration;
 
     res.writeHead(200, {
-
         "Content-Type": "application/octet-stream",
-
         "Cache-Control": "no-store, no-cache, must-revalidate",
-
         "Pragma": "no-cache",
-
         "Expires": "0",
-
         "Content-Encoding": "identity",
-
         "Access-Control-Allow-Origin": "*",
-
         "Connection": "keep-alive"
     });
 
     const chunk = Buffer.alloc(chunkSize);
-
     let closed = false;
 
     req.on("close", () => {
-
         closed = true;
-
-        try {
-            res.end();
-        } catch {}
+        try { res.end(); } catch {}
     });
 
     async function stream() {
-
-        while (
-            !closed &&
-            Date.now() < endTime
-        ) {
-
+        while (!closed && Date.now() < endTime) {
             const ok = res.write(chunk);
-
             if (!ok) {
-
-                await new Promise(resolve =>
-                    res.once("drain", resolve)
-                );
+                await new Promise(resolve => res.once("drain", resolve));
             }
+            // Small delay to prevent overwhelming free tier CPU
+            await new Promise(r => setTimeout(r, 5));
         }
-
-        if (!closed) {
-            res.end();
-        }
+        if (!closed) res.end();
     }
 
     stream();
 });
 
-/* =========================================
-   UPLOAD TEST ROUTE
-========================================= */
-
+/* Upload - accept up to 10MB */
 app.post(
     "/upload",
     express.raw({
         type: "*/*",
-        limit: "50mb"
+        limit: "10mb"
     }),
     (req, res) => {
-
         res.set({
             "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*"
         });
-
-        res.json({
-            success: true
-        });
+        res.json({ success: true });
     }
 );
 
-/* =========================================
-   START SERVER
-========================================= */
-
+/* Start server */
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
-
-    console.log(
-        `🚀 Cymor Speed Test running on port ${PORT}`
-    );
+    console.log(`🚀 Cymor Speed Test running on port ${PORT}`);
 });
