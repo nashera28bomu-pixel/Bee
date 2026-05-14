@@ -17,15 +17,14 @@ const shareBtn = document.getElementById("shareBtn");
 const ctx = document.getElementById("gauge").getContext("2d");
 
 /* ======================
-   SPEED TEST SETTINGS
+   SETTINGS (FIXED)
 ====================== */
 
-let TEST_DURATION = 90000; // 90 seconds (Ookla-like duration)
 let STREAMS = 4;
 let speedSamples = [];
 
 /* ======================
-   SPEED GAUGE
+   GAUGE
 ====================== */
 
 function drawGauge(value) {
@@ -37,14 +36,12 @@ function drawGauge(value) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // background ring
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.strokeStyle = "rgba(255,255,255,0.08)";
     ctx.lineWidth = 15;
     ctx.stroke();
 
-    // progress arc
     const endAngle = (value / 100) * (Math.PI * 2);
 
     ctx.beginPath();
@@ -60,7 +57,7 @@ function drawGauge(value) {
 }
 
 /* ======================
-   SMOOTH SPEED ANIMATION
+   SPEED ANIMATION
 ====================== */
 
 function updateSpeed(target) {
@@ -83,7 +80,7 @@ function updateSpeed(target) {
 }
 
 /* ======================
-   NOTIFICATION (FIXED)
+   NOTIFICATION
 ====================== */
 
 async function notifyDone(download, upload) {
@@ -146,48 +143,75 @@ async function runPingTest() {
 }
 
 /* ======================
-   REAL DOWNLOAD TEST (OOKLA STYLE)
+   FIXED DOWNLOAD TEST (NO FREEZE)
 ====================== */
 
 async function realDownloadTest() {
 
     statusText.innerText = "Warming up connection...";
 
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 2000));
 
-    statusText.innerText = "Testing Download (Stable Mode)...";
+    statusText.innerText = "Testing Download...";
 
-    const startTime = Date.now();
     speedSamples = [];
 
-    async function runStream() {
+    const controllers = [];
 
-        let loaded = 0;
-        const start = performance.now();
+    function runStream() {
 
-        const res = await fetch("/download?cache=" + Math.random());
-        const reader = res.body.getReader();
+        return new Promise(async (resolve) => {
 
-        while (Date.now() - startTime < TEST_DURATION) {
+            const controller = new AbortController();
+            controllers.push(controller);
 
-            const { done, value } = await reader.read();
-            if (done) break;
+            let loaded = 0;
+            const start = performance.now();
 
-            loaded += value.length;
+            try {
 
-            const duration = (performance.now() - start) / 1000;
+                const res = await fetch("/download?cache=" + Math.random(), {
+                    signal: controller.signal
+                });
 
-            const mbps = (loaded * 8) / duration / 1024 / 1024;
+                const reader = res.body.getReader();
 
-            speedSamples.push(mbps);
+                while (true) {
 
-            updateSpeed(mbps);
-        }
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    loaded += value.length;
+
+                    const duration = (performance.now() - start) / 1000;
+
+                    const mbps = (loaded * 8) / duration / 1024 / 1024;
+
+                    speedSamples.push(mbps);
+
+                    updateSpeed(mbps);
+                }
+
+            } catch (e) {
+                // stream stopped safely
+            }
+
+            resolve();
+        });
     }
+
+    // auto stop after 20 seconds (SAFE FIX)
+    const timeout = setTimeout(() => {
+        controllers.forEach(c => c.abort());
+    }, 20000);
 
     await Promise.all(
         Array.from({ length: STREAMS }, runStream)
     );
+
+    clearTimeout(timeout);
+
+    if (speedSamples.length === 0) return 0;
 
     const avg =
         speedSamples.reduce((a, b) => a + b, 0) /
@@ -202,7 +226,7 @@ async function realDownloadTest() {
 
 async function realUploadTest() {
 
-    statusText.innerText = "Testing Upload Stability...";
+    statusText.innerText = "Testing Upload...";
 
     await new Promise(r => setTimeout(r, 2000));
 
@@ -225,12 +249,10 @@ async function realUploadTest() {
 }
 
 /* ======================
-   FINISH TEST (FINAL UX)
+   FINISH TEST
 ====================== */
 
 function finishTest(download, upload) {
-
-    const ping = parseFloat(pingText.innerText);
 
     statusText.innerText = "✔ Test Complete - Results Ready";
 
@@ -239,10 +261,8 @@ function finishTest(download, upload) {
 
     updateSpeed(download);
 
-    // show share button ONLY now
     shareBtn.classList.remove("hidden");
 
-    // notification
     notifyDone(download, upload);
 }
 
