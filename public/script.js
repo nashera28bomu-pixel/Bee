@@ -373,7 +373,7 @@ async function realDownloadTest(){
 
             if(
                 mbps > 0 &&
-                mbps < 5000
+                mbps < 1000
             ){
 
                 speedSamples.push(
