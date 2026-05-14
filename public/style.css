@@ -1,0 +1,158 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:'Poppins',sans-serif;
+    background:#050816;
+    color:white;
+    overflow-x:hidden;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+}
+
+.bg{
+    position:fixed;
+    inset:0;
+    background:
+    radial-gradient(circle at top left,#00c3ff33,transparent 40%),
+    radial-gradient(circle at bottom right,#8f00ff33,transparent 40%);
+    z-index:-1;
+}
+
+.container{
+    width:90%;
+    max-width:1000px;
+    text-align:center;
+    padding:40px 20px;
+}
+
+.logo{
+    font-size:2rem;
+    font-weight:700;
+    margin-bottom:15px;
+    color:#00c3ff;
+}
+
+h1{
+    font-size:3rem;
+    margin-bottom:10px;
+}
+
+.subtitle{
+    color:#ccc;
+    margin-bottom:40px;
+}
+
+#startBtn,
+#shareBtn{
+    border:none;
+    outline:none;
+    padding:18px 35px;
+    border-radius:50px;
+    font-size:1rem;
+    font-weight:600;
+    cursor:pointer;
+    transition:0.3s;
+    background:linear-gradient(45deg,#00c3ff,#8f00ff);
+    color:white;
+    margin:15px;
+    box-shadow:0 0 25px #00c3ff66;
+}
+
+#startBtn:hover,
+#shareBtn:hover{
+    transform:scale(1.05);
+}
+
+.speed-circle{
+    width:260px;
+    height:260px;
+    border-radius:50%;
+    margin:40px auto;
+    border:10px solid #00c3ff;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    box-shadow:
+    0 0 25px #00c3ff,
+    0 0 60px #8f00ff44;
+}
+
+.speed-number{
+    font-size:4rem;
+    font-weight:700;
+}
+
+.speed-unit{
+    font-size:1.2rem;
+    color:#aaa;
+}
+
+.status{
+    margin-bottom:30px;
+    font-size:1.1rem;
+    color:#00c3ff;
+}
+
+.results{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+    margin-top:20px;
+}
+
+.card{
+    background:rgba(255,255,255,0.05);
+    border:1px solid rgba(255,255,255,0.1);
+    padding:25px;
+    border-radius:25px;
+    backdrop-filter:blur(10px);
+    transition:0.3s;
+}
+
+.card:hover{
+    transform:translateY(-5px);
+}
+
+.card h2{
+    font-size:1rem;
+    color:#00c3ff;
+    margin-bottom:15px;
+}
+
+.card p{
+    font-size:2rem;
+    font-weight:700;
+}
+
+footer{
+    margin:40px 0 20px;
+    text-align:center;
+    color:#999;
+    font-size:0.95rem;
+    line-height:1.8;
+}
+
+@media(max-width:768px){
+
+    h1{
+        font-size:2rem;
+    }
+
+    .speed-circle{
+        width:220px;
+        height:220px;
+    }
+
+    .speed-number{
+        font-size:3rem;
+    }
+
+}
