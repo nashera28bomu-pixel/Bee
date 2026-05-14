@@ -28,7 +28,6 @@ let speedSamples = [];
 ====================== */
 
 function drawGauge(value) {
-
     const canvas = ctx.canvas;
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
@@ -61,21 +60,17 @@ function drawGauge(value) {
 ====================== */
 
 function updateSpeed(target) {
-
     let current = parseFloat(mainSpeed.innerText) || 0;
 
     function step() {
         current += (target - current) * 0.12;
-
         mainSpeed.innerText = current.toFixed(1);
-
         drawGauge(Math.min(current, 100));
 
         if (Math.abs(target - current) > 0.2) {
             requestAnimationFrame(step);
         }
     }
-
     step();
 }
 
@@ -84,13 +79,10 @@ function updateSpeed(target) {
 ====================== */
 
 async function notifyDone(download, upload) {
-
     if (!("Notification" in window)) return;
-
     if (Notification.permission === "default") {
         await Notification.requestPermission();
     }
-
     if (Notification.permission === "granted") {
         new Notification("⚡ Cymor Online Speed Test Complete", {
             body: `Download: ${download.toFixed(1)} Mbps | Upload: ${upload.toFixed(1)} Mbps`
@@ -106,12 +98,9 @@ async function detectISP() {
     try {
         const res = await fetch("https://ipapi.co/json/");
         const data = await res.json();
-
         const isp = data.org || "Unknown ISP";
-
         provider.innerText = isp;
         providerName.innerText = isp;
-
     } catch {
         provider.innerText = "Unknown ISP";
         providerName.innerText = "Unknown";
@@ -123,129 +112,107 @@ async function detectISP() {
 ====================== */
 
 async function runPingTest() {
-
     statusText.innerText = "Testing Ping...";
-
     const samples = [];
-
     for (let i = 0; i < 5; i++) {
-
         const start = performance.now();
-        await fetch("/ping");
-        const end = performance.now();
-
-        samples.push(end - start);
+        try {
+            await fetch("/ping", { cache: 'no-store' });
+            const end = performance.now();
+            samples.push(end - start);
+        } catch (e) {
+            samples.push(0);
+        }
     }
-
     const avg = samples.reduce((a, b) => a + b) / samples.length;
-
     pingText.innerText = avg.toFixed(0) + " ms";
 }
 
 /* ======================
-   FIXED DOWNLOAD TEST (NO FREEZE)
+   DOWNLOAD TEST
 ====================== */
 
 async function realDownloadTest() {
-
-    statusText.innerText = "Warming up connection...";
-
-    await new Promise(r => setTimeout(r, 2000));
-
     statusText.innerText = "Testing Download...";
-
     speedSamples = [];
-
     const controllers = [];
 
     function runStream() {
-
         return new Promise(async (resolve) => {
-
             const controller = new AbortController();
             controllers.push(controller);
-
             let loaded = 0;
             const start = performance.now();
 
             try {
-
                 const res = await fetch("/download?cache=" + Math.random(), {
                     signal: controller.signal
                 });
-
                 const reader = res.body.getReader();
-
                 while (true) {
-
                     const { done, value } = await reader.read();
                     if (done) break;
-
                     loaded += value.length;
-
                     const duration = (performance.now() - start) / 1000;
-
                     const mbps = (loaded * 8) / duration / 1024 / 1024;
-
                     speedSamples.push(mbps);
-
                     updateSpeed(mbps);
                 }
-
-            } catch (e) {
-                // stream stopped safely
-            }
-
+            } catch (e) {}
             resolve();
         });
     }
 
-    // auto stop after 20 seconds (SAFE FIX)
-    const timeout = setTimeout(() => {
-        controllers.forEach(c => c.abort());
-    }, 20000);
-
-    await Promise.all(
-        Array.from({ length: STREAMS }, runStream)
-    );
-
+    const timeout = setTimeout(() => controllers.forEach(c => c.abort()), 10000); // 10s for speed
+    await Promise.all(Array.from({ length: STREAMS }, runStream));
     clearTimeout(timeout);
 
     if (speedSamples.length === 0) return 0;
-
-    const avg =
-        speedSamples.reduce((a, b) => a + b, 0) /
-        speedSamples.length;
-
-    return avg;
+    
+    // Use the 80th percentile or the latter half of samples for a more accurate sustained speed
+    const stableSamples = speedSamples.slice(Math.floor(speedSamples.length * 0.5));
+    return stableSamples.reduce((a, b) => a + b, 0) / stableSamples.length;
 }
 
 /* ======================
-   UPLOAD TEST
+   UPLOAD TEST (FIXED)
 ====================== */
 
 async function realUploadTest() {
-
     statusText.innerText = "Testing Upload...";
-
-    await new Promise(r => setTimeout(r, 2000));
-
-    const size = 8 * 1024 * 1024;
-    const data = new Uint8Array(size);
+    const chunkSize = 1024 * 1024 * 1.5; // 1.5MB chunks
+    const data = new Uint8Array(chunkSize);
     crypto.getRandomValues(data);
 
-    const start = performance.now();
+    let uploadSamples = [];
+    const testDuration = 8000; // 8 seconds test
+    const endTime = performance.now() + testDuration;
 
-    await fetch("/upload", {
-        method: "POST",
-        body: data
-    });
+    while (performance.now() < endTime) {
+        const start = performance.now();
+        try {
+            await fetch("/upload", {
+                method: "POST",
+                body: data,
+                cache: 'no-store'
+            });
+            const end = performance.now();
+            const duration = (end - start) / 1000;
+            const mbps = (chunkSize * 8) / duration / 1024 / 1024;
+            
+            // Filter out unrealistic spikes (e.g. localhost/cache hits)
+            if (mbps < 5000) { 
+                uploadSamples.push(mbps);
+                updateSpeed(mbps);
+            }
+        } catch (e) {
+            console.error("Upload chunk failed");
+            break; 
+        }
+    }
 
-    const end = performance.now();
-
-    const duration = (end - start) / 1000;
-
-    return (size * 8) / duration / 1024 / 1024;
+    if (uploadSamples.length === 0) return 0;
+    return uploadSamples.reduce((a, b) => a + b) / uploadSamples.length;
 }
 
 /* ======================
@@ -253,16 +220,11 @@ async function realUploadTest() {
 ====================== */
 
 function finishTest(download, upload) {
-
-    statusText.innerText = "✔ Test Complete - Results Ready";
-
+    statusText.innerText = "✔ Test Complete";
     downloadText.innerText = download.toFixed(1) + " Mbps";
     uploadText.innerText = upload.toFixed(1) + " Mbps";
-
     updateSpeed(download);
-
     shareBtn.classList.remove("hidden");
-
     notifyDone(download, upload);
 }
 
@@ -271,25 +233,27 @@ function finishTest(download, upload) {
 ====================== */
 
 startBtn.addEventListener("click", async () => {
+    try {
+        startBtn.disabled = true;
+        hero.classList.add("hidden");
+        testScreen.classList.remove("hidden");
 
-    hero.classList.add("hidden");
-    testScreen.classList.remove("hidden");
+        await detectISP();
+        await runPingTest();
 
-    speedSamples = [];
+        const download = await realDownloadTest();
+        
+        // Reset gauge briefly before upload
+        updateSpeed(0); 
+        await new Promise(r => setTimeout(r, 500));
 
-    await detectISP();
+        const upload = await realUploadTest();
 
-    statusText.innerText = "Initializing test...";
-
-    await runPingTest();
-
-    statusText.innerText = "Preparing high-precision test...";
-
-    const download = await realDownloadTest();
-
-    statusText.innerText = "Switching to upload test...";
-
-    const upload = await realUploadTest();
-
-    finishTest(download, upload);
+        finishTest(download, upload);
+    } catch (err) {
+        statusText.innerText = "❌ Error: Could not complete test.";
+        console.error(err);
+    } finally {
+        startBtn.disabled = false;
+    }
 });
