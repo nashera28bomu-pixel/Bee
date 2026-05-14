@@ -22,46 +22,89 @@ const shareBtn = document.getElementById("shareBtn");
 
 const resultCard = document.getElementById("resultCard");
 
-let chart;
+const bg = document.getElementById("bgElements");
 
 const ctx = document.getElementById("speedChart");
 
-chart = new Chart(ctx, {
-    type: "line",
-    data: {
-        labels: [],
-        datasets: [{
-            label: "Speed Mbps",
-            data: [],
-            borderColor: "#00c3ff",
-            tension: 0.4
+const chart = new Chart(ctx, {
+
+    type:"line",
+
+    data:{
+        labels:[],
+        datasets:[{
+            label:"Mbps",
+            data:[],
+            borderColor:"#00c3ff",
+            tension:0.4
         }]
     },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                labels: {
-                    color: "white"
+
+    options:{
+        responsive:true,
+
+        plugins:{
+            legend:{
+                labels:{
+                    color:"white"
                 }
             }
         },
-        scales: {
-            x: {
-                ticks: {
-                    color: "white"
+
+        scales:{
+            x:{
+                ticks:{
+                    color:"white"
                 }
             },
-            y: {
-                ticks: {
-                    color: "white"
+
+            y:{
+                ticks:{
+                    color:"white"
                 }
             }
         }
     }
+
 });
 
-startBtn.addEventListener("click", async () => {
+const chars = [
+"10",
+"50",
+"100",
+"Mbps",
+"5G",
+"⚡",
+"PING",
+"NET"
+];
+
+for(let i=0;i<40;i++){
+
+    const span = document.createElement("span");
+
+    span.className = "floating-char";
+
+    span.innerText =
+    chars[Math.floor(Math.random()*chars.length)];
+
+    span.style.left =
+    Math.random()*100 + "vw";
+
+    span.style.fontSize =
+    (Math.random()*35 + 15) + "px";
+
+    span.style.animationDuration =
+    (Math.random()*15 + 10) + "s";
+
+    span.style.animationDelay =
+    Math.random()*5 + "s";
+
+    bg.appendChild(span);
+
+}
+
+startBtn.addEventListener("click", async ()=>{
 
     hero.classList.add("hidden");
 
@@ -71,11 +114,13 @@ startBtn.addEventListener("click", async () => {
 
     await runPingTest();
 
-    const download = await simulateDownload();
+    const download =
+    await realDownloadTest();
 
-    const upload = await simulateUpload(download);
+    const upload =
+    await realUploadTest();
 
-    finishTest(download, upload);
+    finishTest(download,upload);
 
 });
 
@@ -83,11 +128,14 @@ async function detectISP(){
 
     try{
 
-        const res = await fetch("https://ipapi.co/json/");
+        const res =
+        await fetch("https://ipapi.co/json/");
 
-        const data = await res.json();
+        const data =
+        await res.json();
 
-        const isp = data.org || "Unknown ISP";
+        const isp =
+        data.org || "Unknown ISP";
 
         provider.innerText = isp;
 
@@ -95,9 +143,11 @@ async function detectISP(){
 
     }catch{
 
-        provider.innerText = "ISP Unknown";
+        provider.innerText =
+        "Unknown ISP";
 
-        providerName.innerText = "Unknown";
+        providerName.innerText =
+        "Unknown";
 
     }
 
@@ -105,132 +155,192 @@ async function detectISP(){
 
 async function runPingTest(){
 
-    statusText.innerText = "Checking Ping...";
+    statusText.innerText =
+    "Checking Ping...";
 
-    const start = performance.now();
+    const start =
+    performance.now();
 
     await fetch("/ping");
 
-    const end = performance.now();
+    const end =
+    performance.now();
 
-    const ping = Math.floor(end - start);
+    const ping =
+    Math.floor(end - start);
 
-    pingText.innerText = ping + " ms";
+    pingText.innerText =
+    ping + " ms";
 
 }
 
-async function simulateDownload(){
+async function realDownloadTest(){
 
-    statusText.innerText = "Testing Download Speed...";
+    statusText.innerText =
+    "Testing Download Speed...";
 
-    return new Promise(resolve => {
+    chart.data.labels = [];
 
-        let speed = 0;
+    chart.data.datasets[0].data = [];
 
-        let count = 0;
+    chart.update();
 
-        const interval = setInterval(() => {
+    const startTime =
+    performance.now();
 
-            speed += Math.random() * 12;
+    const response =
+    await fetch("/download?cache=" + Date.now());
 
-            if(speed > 180){
-                speed = 180 - Math.random() * 20;
-            }
+    const reader =
+    response.body.getReader();
 
-            mainSpeed.innerText = speed.toFixed(1);
+    let receivedLength = 0;
+
+    let speeds = [];
+
+    let lastUpdate =
+    performance.now();
+
+    while(true){
+
+        const {done,value} =
+        await reader.read();
+
+        if(done) break;
+
+        receivedLength += value.length;
+
+        const now =
+        performance.now();
+
+        const duration =
+        (now - startTime)/1000;
+
+        const speedMbps =
+        ((receivedLength*8)/
+        duration/
+        1024/
+        1024);
+
+        speeds.push(speedMbps);
+
+        mainSpeed.innerText =
+        speedMbps.toFixed(1);
+
+        if(now - lastUpdate > 300){
 
             chart.data.labels.push("");
 
-            chart.data.datasets[0].data.push(speed.toFixed(1));
+            chart.data.datasets[0].data.push(
+                speedMbps.toFixed(1)
+            );
 
             chart.update();
 
-            count++;
+            lastUpdate = now;
 
-            if(count > 25){
+        }
 
-                clearInterval(interval);
+    }
 
-                resolve(speed.toFixed(1));
+    const average =
+    speeds.reduce((a,b)=>a+b,0)
+    / speeds.length;
 
-            }
+    return average.toFixed(1);
 
-        }, 200);
+}
 
+async function realUploadTest(){
+
+    statusText.innerText =
+    "Testing Upload Speed...";
+
+    const size =
+    5 * 1024 * 1024;
+
+    const data =
+    new Uint8Array(size);
+
+    crypto.getRandomValues(data);
+
+    const start =
+    performance.now();
+
+    await fetch("/upload",{
+        method:"POST",
+        body:data
     });
 
-}
+    const end =
+    performance.now();
 
-async function simulateUpload(download){
+    const duration =
+    (end - start)/1000;
 
-    statusText.innerText = "Testing Upload Speed...";
+    const speed =
+    ((size*8)/
+    duration/
+    1024/
+    1024);
 
-    return new Promise(resolve => {
-
-        let speed = download / 2;
-
-        let count = 0;
-
-        const interval = setInterval(() => {
-
-            speed += Math.random() * 4 - 2;
-
-            mainSpeed.innerText = speed.toFixed(1);
-
-            count++;
-
-            if(count > 15){
-
-                clearInterval(interval);
-
-                resolve(speed.toFixed(1));
-
-            }
-
-        }, 200);
-
-    });
+    return speed.toFixed(1);
 
 }
 
-function finishTest(download, upload){
+function finishTest(download,upload){
 
-    statusText.innerText = "✅ Speed Test Complete";
+    statusText.innerText =
+    "✅ Speed Test Complete";
 
-    downloadText.innerText = download + " Mbps";
+    downloadText.innerText =
+    download + " Mbps";
 
-    uploadText.innerText = upload + " Mbps";
+    uploadText.innerText =
+    upload + " Mbps";
 
-    mainSpeed.innerText = download;
+    mainSpeed.innerText =
+    download;
 
 }
 
-shareBtn.addEventListener("click", async () => {
+shareBtn.addEventListener("click",async()=>{
 
-    const canvas = await html2canvas(resultCard);
+    const canvas =
+    await html2canvas(resultCard);
 
-    canvas.toBlob(async(blob) => {
+    canvas.toBlob(async(blob)=>{
 
-        const file = new File(
-            [blob],
-            "cymor-speed-result.png",
-            { type:"image/png" }
+        const file =
+        new File(
+        [blob],
+        "cymor-speed-result.png",
+        {type:"image/png"}
         );
 
-        if(navigator.canShare && navigator.canShare({ files:[file] })){
+        if(
+        navigator.canShare &&
+        navigator.canShare({
+            files:[file]
+        })
+        ){
 
             await navigator.share({
-                title:"Cymor Internet Speed Test",
+                title:
+                "Cymor Online Speed Test",
                 files:[file]
             });
 
         }else{
 
-            const link = document.createElement("a");
+            const link =
+            document.createElement("a");
 
-            link.href = URL.createObjectURL(blob);
+            link.href =
+            URL.createObjectURL(blob);
 
-            link.download = "cymor-speed-result.png";
+            link.download =
+            "cymor-speed-result.png";
 
             link.click();
 
