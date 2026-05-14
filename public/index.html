@@ -1,112 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cymor Online Speed Test</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cymor News Hub</title>
 
-    <link rel="stylesheet" href="style.css">
-
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
-
-    <!-- Dependencies -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
 
-    <div class="bg"></div>
-    <div class="bg-elements" id="bgElements"></div>
+<header>
+  <div class="logo">
+    CYMOR NEWS HUB
+  </div>
 
-    <!-- ================= HERO ================= -->
-    <section class="hero" id="hero">
-        <div>
-            <div class="logo">
-                ⚡ Cymor Online Speed Test
-            </div>
-            <h1>
-                EXPERIENCE REAL INTERNET SPEED TESTING
-            </h1>
-            <p class="subtitle">
-                Live Mbps Tracking • ISP Detection • Share Results
-            </p>
-        </div>
+  <div class="searchBox">
+    <input type="text" id="searchInput" placeholder="Search news...">
+    <button id="searchBtn">Search</button>
+  </div>
+</header>
 
-        <button id="startBtn">
-            TEST YOUR INTERNET SPEED NOW
-        </button>
-    </section>
+<div class="ticker">
+  <marquee id="tickerText">
+    Loading breaking news...
+  </marquee>
+</div>
 
-    <!-- ================= TEST SCREEN ================= -->
-    <section class="test-screen hidden" id="testScreen">
+<section class="categories">
+  <button class="cat active" data-cat="general">General</button>
+  <button class="cat" data-cat="world">World</button>
+  <button class="cat" data-cat="technology">Technology</button>
+  <button class="cat" data-cat="sports">Sports</button>
+  <button class="cat" data-cat="business">Business</button>
+  <button class="cat" data-cat="health">Health</button>
+</section>
 
-        <div class="top-bar">
-            <div class="mini-logo">⚡ Cymor Online Speed Test</div>
-            <div class="provider" id="provider">Detecting ISP...</div>
-        </div>
+<section id="hero"></section>
 
-        <!-- SPEED GAUGE -->
-        <div class="speed-area">
-            <div class="speed-circle">
-                <canvas id="gauge" width="260" height="260"></canvas>
-                <div style="position:absolute;text-align:center;">
-                    <div class="speed-value" id="mainSpeed">0</div>
-                    <div class="speed-unit">Mbps</div>
-                </div>
-            </div>
-            <div class="status" id="status">Preparing Test...</div>
-        </div>
+<section id="newsGrid"></section>
 
-        <!-- LIVE GRAPH (Occupies the black space during the test) -->
-        <div class="graph-box" id="graphContainer">
-            <canvas id="speedChart"></canvas>
-        </div>
-
-        <!-- RESULTS CARD (Matches 603849.jpg) -->
-        <div class="results-card" id="resultCard">
-            <div class="share-title">🚀 YOUR INTERNET RESULTS</div>
-            
-            <div class="results-grid">
-                <div class="result-box">
-                    <p>↓ Download</p>
-                    <h3 id="download">-- Mbps</h3>
-                </div>
-
-                <div class="result-box">
-                    <p>↑ Upload</p>
-                    <h3 id="upload">-- Mbps</h3>
-                </div>
-
-                <div class="result-box">
-                    <p>📶 Ping</p>
-                    <h3 id="ping">-- ms</h3>
-                </div>
-
-                <div class="result-box">
-                    <p>🌐 Provider</p>
-                    <h3 id="providerName">Detecting...</h3>
-                </div>
-            </div>
-
-            <!-- SHARE BUTTON -->
-            <button id="shareBtn" class="hidden share-btn">
-                SHARE RESULTS AS IMAGE
-            </button>
-        </div>
-
-    </section>
-
-    <!-- ================= FOOTER ================= -->
-    <footer>
-        Site made by the Legendary Smiley Cymor <br>
-        © CymorTechServices 2026
-    </footer>
-
-    <script src="script.js"></script>
-
+<script src="script.js"></script>
 </body>
 </html>
