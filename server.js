@@ -5,61 +5,58 @@ const path = require("path");
 const app = express();
 
 app.use(compression());
-
 app.use(express.static(path.join(__dirname, "public")));
 
+/**
+ * REALISTIC PING ENDPOINT
+ */
 app.get("/ping", (req, res) => {
-    res.send("pong");
+    const start = Date.now();
+    res.json({ ok: true, serverTime: start });
 });
 
+/**
+ * MULTI STREAM DOWNLOAD ENDPOINT
+ * stream=1..4 used for parallel testing
+ */
 app.get("/download", (req, res) => {
 
-    const size = 25 * 1024 * 1024;
+    const size = 10 * 1024 * 1024; // 10MB per stream (realistic)
+    const chunkSize = 64 * 1024;
 
     res.writeHead(200, {
         "Content-Type": "application/octet-stream",
         "Content-Length": size,
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-store",
         "Connection": "keep-alive"
     });
 
-    const chunk = Buffer.alloc(1024 * 256, "X");
+    const chunk = Buffer.alloc(chunkSize, "A");
 
     let sent = 0;
 
-    const interval = setInterval(() => {
-
-        if(sent >= size){
-
-            clearInterval(interval);
-
-            return res.end();
-
-        }
+    function send() {
+        if (sent >= size) return res.end();
 
         res.write(chunk);
+        sent += chunkSize;
 
-        sent += chunk.length;
+        // REMOVE artificial speed bias (critical fix)
+        setImmediate(send);
+    }
 
-    }, 1);
-
+    send();
 });
 
-app.post("/upload",
-express.raw({
-    limit:"50mb",
-    type:"*/*"
-}),
-(req,res)=>{
-
-    res.json({
-        success:true
-    });
-
+/**
+ * UPLOAD TEST
+ */
+app.post("/upload", express.raw({ limit: "50mb", type: "*/*" }), (req, res) => {
+    res.json({ success: true });
 });
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log(`🚀 Cymor Speed Test running on ${PORT}`);
+    console.log("🚀 Cymor Ultra Speed Test running on", PORT);
 });
