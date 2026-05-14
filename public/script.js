@@ -23,8 +23,8 @@ const ctx = document.getElementById("gauge").getContext("2d");
 /* ======================
    SETTINGS & STATE
 ====================== */
-// Reduced from 4 to 2 for stability on Render Free tier to prevent Brotli memory leaks
-let STREAMS = 2; 
+// Set to 1 for maximum stability on Free Tier to prevent memory leak warnings
+let STREAMS = 1; 
 let speedSamples = [];
 
 /* ======================
@@ -276,9 +276,9 @@ startBtn.addEventListener("click", async () => {
         const download = await realDownloadTest();
         
         // 2. Cooldown Phase
-        // IMPORTANT: Increase delay to 1.5s to let the server clear Brotli streams
+        // Reset speed to 0 and wait 3 seconds to let server CPU/memory settle
         updateSpeed(0); 
-        await new Promise(r => setTimeout(r, 1500));
+        await new Promise(r => setTimeout(r, 3000)); 
 
         // 3. Upload Phase
         const upload = await realUploadTest();
