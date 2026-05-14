@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Cymor Internet Speed Test</title>
 
@@ -14,13 +15,17 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
 </head>
 
 <body>
 
 <div class="bg"></div>
 
-<div class="container">
+<div class="hero" id="hero">
 
     <div class="logo">
         ⚡ Cymor Internet Speed Test
@@ -33,12 +38,28 @@
     </p>
 
     <button id="startBtn">
-        START SPEED TEST
+        TEST YOUR INTERNET SPEED NOW
     </button>
 
-    <div class="speed-circle">
+</div>
 
-        <div class="speed-number" id="mainSpeed">
+<div class="test-screen hidden" id="testScreen">
+
+    <div class="top-bar">
+
+        <div class="mini-logo">
+            ⚡ Cymor Speed Test
+        </div>
+
+        <div class="provider" id="provider">
+            Detecting ISP...
+        </div>
+
+    </div>
+
+    <div class="speed-area">
+
+        <div class="speed-value" id="mainSpeed">
             0
         </div>
 
@@ -46,34 +67,51 @@
             Mbps
         </div>
 
-    </div>
-
-    <div class="status" id="status">
-        Ready to test...
-    </div>
-
-    <div class="results">
-
-        <div class="card">
-            <h2>DOWNLOAD</h2>
-            <p id="download">0 Mbps</p>
-        </div>
-
-        <div class="card">
-            <h2>UPLOAD</h2>
-            <p id="upload">0 Mbps</p>
-        </div>
-
-        <div class="card">
-            <h2>PING</h2>
-            <p id="ping">0 ms</p>
+        <div class="status" id="status">
+            Initializing...
         </div>
 
     </div>
 
-    <button id="shareBtn">
-        SHARE RESULTS
-    </button>
+    <div class="graph-box">
+
+        <canvas id="speedChart"></canvas>
+
+    </div>
+
+    <div class="results-card" id="resultCard">
+
+        <h2>🚀 YOUR INTERNET RESULTS</h2>
+
+        <div class="results-grid">
+
+            <div class="result-box">
+                <span>⬇ Download</span>
+                <h3 id="download">0 Mbps</h3>
+            </div>
+
+            <div class="result-box">
+                <span>⬆ Upload</span>
+                <h3 id="upload">0 Mbps</h3>
+            </div>
+
+            <div class="result-box">
+                <span>📶 Ping</span>
+                <h3 id="ping">0 ms</h3>
+            </div>
+
+            <div class="result-box">
+                <span>🌐 Provider</span>
+                <h3 id="providerName">Unknown</h3>
+            </div>
+
+        </div>
+
+        <button id="shareBtn">
+            SHARE RESULTS AS IMAGE
+        </button>
+
+    </div>
 
 </div>
 
