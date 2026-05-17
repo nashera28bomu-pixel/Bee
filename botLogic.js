@@ -67,7 +67,7 @@ async function handleIncomingMessage(sock, msg) {
             break;
 
         default:
-            // Fallback checking for casual keyword matching before outputting unknown command error
+            // Fallback checking for casual keyword matching
             if (cleanText.includes('location') || cleanText.includes('where')) {
                 await sendStoreInfo(sock, from);
             } else if (cleanText.includes('pay') || cleanText.includes('mpesa')) {
@@ -98,11 +98,11 @@ async function sendMainMenu(sock, to, name) {
                      `Welcome to Kenya's premium destination for verified, elite-tier authentic streetwear & sneakers.\n\n` +
                      `▫️ *𝖲𝖤𝖫𝖤𝖢𝖳 𝖠𝖭 𝖮𝖯𝖳𝖨𝖮𝖭:* ▫️\n` +
                      `Reply with the number *(1 - 5)* to navigate:\n\n` +
-                     `  *[1]*  👟  𝖵𝗂𝖾𝖿 𝖫𝖺𝗍𝖾𝗌𝗍 𝖲𝗇𝖾𝖺𝗄𝖾𝗋 𝖢𝖺𝗍𝖺𝗅𝗈𝗀\n` +
-                     `  *[2]*  🛍️  𝖯𝗅𝖺𝖼𝖾 𝖺 𝖭𝖾𝗐 𝖮𝗋𝖽𝖾𝗋 𝖨𝗇𝗌𝗍𝖺𝗇𝗍𝗅𝗒\n` +
-                     `  *[3]*  📦  𝖣𝖾𝗅𝗂𝗏𝖾𝗋𝗒 𝖱𝖺𝗍𝖾𝗌 & 𝖳𝗂𝗆𝖾𝗅𝗂𝗇𝖾𝗌\n` +
-                     `  *[4]*  📍  𝖯𝖧𝗒𝗌𝗂𝖼𝖺𝗅 𝖲𝗍𝗈𝗋𝖾 𝖧𝗎𝖻 & 𝖧𝗈𝗎𝗋𝗌\n` +
-                     `  *[5]*  💳  𝖯𝖺𝗒𝗆𝖾𝗇𝗍 𝖬𝖾𝗍𝗁𝗈𝖽𝗌 & 𝖯𝗈𝗅𝗂𝖼𝗂𝖾𝗌\n\n` +
+                     `  *[1]* 👟  𝖵𝗂𝖾𝖿 𝖫𝖺𝗍𝖾𝗌𝗍 𝖲𝗇𝖾𝖺𝗄𝖾𝗋 𝖢𝖺𝗍𝖺𝗅𝗈𝗀\n` +
+                     `  *[2]* 🛍️  𝖯𝗅𝖺𝖼𝖾 𝖺 𝖭𝖾𝗐 𝖮𝗋𝖽𝖾𝗋 𝖨𝗇𝗌𝗍𝖺𝗇𝗍𝗅𝗒\n` +
+                     `  *[3]* 📦  𝖣𝖾𝗅𝗂𝗏𝖾𝗋𝗒 𝖱𝖺𝗍𝖾𝗌 & 𝖳𝗂𝗆𝖾𝗅𝗂𝖾𝗌\n` +
+                     `  *[4]* 📍  𝖯𝖧𝗒𝗌𝗂𝖼𝖺𝗅 𝖲𝗍𝗈𝗋𝖾 𝖧𝗎𝖻 & 𝖧𝗈𝗎𝗋𝗌\n` +
+                     `  *[5]* 💳  𝖯𝖺𝗒𝗆𝖾𝗇𝗍 𝖬𝖾𝗍𝗁𝗈𝖽𝗌 & 𝖯𝗈𝗅𝗂𝖼𝗂𝖾𝗌\n\n` +
                      `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
                      `⚡ *Powered by CymorTechServices*`;
     
@@ -117,7 +117,7 @@ async function sendCatalog(sock, to) {
 
     SHOE_CATALOG.forEach(shoe => {
         catalogText += `┌─ 📦 *${shoe.name.toUpperCase()}*\n` +
-                       `│ 🆔 *Code:* \`${shoe.id}\` \n` +
+                       `│ 🆔 *Code:* ${shoe.id} \n` + // Removed backticks here to prevent syntax conflicts
                        `│ 💰 *Price:* KSh ${shoe.price.toLocaleString()}\n` +
                        `│ 📏 *Sizes:* [ ${shoe.sizes.join(' - ')} ]\n` +
                        `│ ✨ *Availability:* ${shoe.instock ? '🟢 AVAILABLE' : '🔴 SOLD OUT'}\n` +
@@ -133,27 +133,27 @@ async function sendCatalog(sock, to) {
 }
 
 async function sendDeliveryInfo(sock, to) {
-    let deliveryText = `📦 ━━━━━━━━━━━━━━━━━ 📦\n` +
-                       `⚡ *𝖫𝖮𝖦𝖨𝖲𝖳𝖨𝖢𝖲 & 𝖥𝖱𝖤𝖨𝖦𝖧𝖳 𝖱𝖠𝖳𝖤𝖲* ⚡\n` +
-                       `📦 ━━━━━━━━━━━━━━━━━ 📦\n\n` +
-                       `We provide rapid countrywide distribution networks daily:\n\n` +
-                       ` ```\n`;
+    const header = `📦 ━━━━━━━━━━━━━━━━━ 📦\n` +
+                   `⚡ *𝖫𝖮𝖦𝖨𝖲𝖳𝖨𝖢𝖲 & 𝖥𝖱𝖤𝖨𝖦𝖧𝖳 𝖱𝖠𝖳𝖤𝖲* ⚡\n` +
+                   `📦 ━━━━━━━━━━━━━━━━━ 📦\n\n` +
+                   `We provide rapid countrywide distribution networks daily:\n\n`;
 
+    let deliveryList = "```\n"; // Sanitized string for Render
     for (const [zone, rate] of Object.entries(DELIVERY_AREAS)) {
         const paddedZone = zone.toUpperCase().padEnd(15, ' ');
         const formattedRate = rate === 0 ? "FREE" : `KSh ${rate}`;
-        deliveryText += `${paddedZone} : ${formattedRate}\n`;
+        deliveryList += `${paddedZone} : ${formattedRate}\n`;
     }
+    deliveryList += "```\n";
 
-    deliveryText += ` ```\n` +
-                    `⏱️ *𝖤𝖷𝖯𝖤𝖣𝖨𝖳𝖤𝖣 𝖳𝖨𝖬𝖤𝖫𝖨𝖭𝖤𝖲:*\n` +
-                    `• *Nairobi Environs:* Delivered within 2-3 hours max.\n` +
-                    `• *Countrywide:* Dispatched via Wells Fargo / G4S within 24 hours.\n\n` +
-                    `↩️ Reply *menu* to return to listings.\n` +
-                    `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
-                    `⚡ *Powered by CymorTechServices*`;
+    const footer = `⏱️ *𝖤𝖷𝖯𝖤𝖣𝖨𝖳𝖤𝖣 𝖳𝖨𝖬𝖤𝖫𝖨𝖭𝖤𝖲:*\n` +
+                   `• *Nairobi Environs:* Delivered within 2-3 hours max.\n` +
+                   `• *Countrywide:* Dispatched via Wells Fargo / G4S within 24 hours.\n\n` +
+                   `↩️ Reply *menu* to return to listings.\n` +
+                   `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
+                   `⚡ *Powered by CymorTechServices*`;
 
-    await sock.sendMessage(to, { text: deliveryText });
+    await sock.sendMessage(to, { text: header + deliveryList + footer });
 }
 
 async function sendStoreInfo(sock, to) {
@@ -191,12 +191,9 @@ async function sendPaymentInfo(sock, to) {
     await sock.sendMessage(to, { text: paymentText });
 }
 
-// --- MULTI-STAGE CHECKOUT MACHINE WORKFLOW ---
-
 async function handleOrderWorkflow(sock, to, text) {
     const session = userSessions.get(to);
 
-    // Cancel escape loop condition
     if (text === 'cancel' || text === 'exit') {
         userSessions.delete(to);
         await sock.sendMessage(to, { 
@@ -216,7 +213,7 @@ async function handleOrderWorkflow(sock, to, text) {
                 await sock.sendMessage(to, { 
                     text: `❌ *𝖨𝖭𝖵𝖠𝖫𝖨𝖣 𝖨𝖳𝖤𝖬 𝖢𝖮𝖣𝖤*\n\n` +
                           `We couldn't track that active code or the item is sold out.\n` +
-                          `Please look at the catalog parameters and re-enter a valid ID code:\n\n` +
+                          `Please look at the catalog and re-enter a valid ID code:\n\n` +
                           `_Or type *cancel* to return to main dashboard_` 
                 });
                 return;
@@ -226,7 +223,7 @@ async function handleOrderWorkflow(sock, to, text) {
             await sock.sendMessage(to, { 
                 text: `✨ *𝖬𝖮𝖣𝖤𝖫 𝖫𝖮𝖢𝖪𝖤𝖣:* _${selectedShoe.name}_\n\n` +
                       `📐 What *𝖲𝗂𝗓𝖾* do you require?\n\n` +
-                      `👉 Available sizing run for this model: *[ ${selectedShoe.sizes.join(' - ')} ]*\n\n` +
+                      `👉 Available sizing run: *[ ${selectedShoe.sizes.join(' - ')} ]*\n\n` +
                       `▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️\n` +
                       `⚡ *Powered by CymorTechServices*` 
             });
@@ -238,7 +235,7 @@ async function handleOrderWorkflow(sock, to, text) {
             if (isNaN(enteredSize) || !validSizes.includes(enteredSize)) {
                 await sock.sendMessage(to, { 
                     text: `❌ *𝖴𝖭𝖠𝖵𝖠𝖨𝖫𝖠𝖡𝖫𝖤 𝖲𝖨𝖹𝖤*\n\n` +
-                          `Please pick a sizing value directly from our active run profile *[ ${validSizes.join(' - ')} ]*:` 
+                          `Please pick a sizing value directly from: *[ ${validSizes.join(' - ')} ]*:` 
                 });
                 return;
             }
@@ -246,31 +243,30 @@ async function handleOrderWorkflow(sock, to, text) {
             session.stage = 'ENTER_NAME';
             await sock.sendMessage(to, { 
                 text: `👤 *𝖲𝖨𝖹𝖤 𝖱𝖤𝖦𝖨𝖲𝖳𝖤𝖱𝖤𝖣:* _Size ${enteredSize}_\n\n` +
-                      `📝 Please provide the full *𝖭𝖺𝗆𝖾* of the person accepting this package delivery:` 
+                      `📝 Please provide the full *𝖭𝖺𝗆𝖾* of the recipient:` 
             });
             break;
 
         case 'ENTER_NAME':
             if (text.length < 3) {
-                await sock.sendMessage(to, { text: `❌ Please enter a real, valid name configuration for shipping manifests:` });
+                await sock.sendMessage(to, { text: `❌ Please enter a real name for shipping manifests:` });
                 return;
             }
             session.data.customerName = text.toUpperCase();
             session.stage = 'ENTER_LOCATION';
             await sock.sendMessage(to, { 
                 text: `📍 *𝖱𝖤𝖢𝖨𝖯𝖨𝖤𝖭𝖳 𝖲𝖤𝖳:* _${session.data.customerName}_\n\n` +
-                      `🚛 Now state your exact *𝖣𝖾𝗅𝗂𝗏𝖾𝗋𝗒 𝖫𝗈𝖼𝖺𝗍𝗂𝗈𝗇* or destination terminal town (e.g., CBD, Westlands, Mombasa, Nakuru, Eldoret):` 
+                      `🚛 State your exact *𝖣𝖾𝗅𝗂𝗏𝖾𝗋𝗒 𝖫𝗈𝖼𝖺𝗍𝗂𝗈𝗇* (e.g., CBD, Westlands, Mombasa):` 
             });
             break;
 
         case 'ENTER_LOCATION':
             if (text.length < 3) {
-                await sock.sendMessage(to, { text: `❌ Please detail a robust delivery boundary address text line:` });
+                await sock.sendMessage(to, { text: `❌ Please detail a robust delivery address:` });
                 return;
             }
             session.data.location = text.toUpperCase();
             
-            // Deduce delivery cost estimations based on generic matches
             let shippingCost = 300; 
             for (const [zone, rate] of Object.entries(DELIVERY_AREAS)) {
                 if (text.includes(zone.toLowerCase())) {
@@ -281,23 +277,20 @@ async function handleOrderWorkflow(sock, to, text) {
             session.data.shippingCost = shippingCost;
             session.data.totalBill = session.data.shoe.price + shippingCost;
 
-            // Generate Summary Invoice for execution validation
             const clientInvoice = `🧾 ━━━━━━━━━━━━━━━━━ 🧾\n` +
                                   `⚡ *𝖯𝖱𝖤𝖬𝖨𝖴𝖬 𝖨𝖭𝖵𝖮𝖨𝖢𝖤 𝖬𝖠𝖭𝖨𝖥𝖤𝖲𝖳* ⚡\n` +
                                   `🧾 ━━━━━━━━━━━━━━━━━ 🧾\n\n` +
-                                  `Review your order composition before lock down:\n\n` +
-                                  `👟 *MODEL:*  _${session.data.shoe.name}_\n` +
-                                  `🆔 *CODE:*   \`${session.data.shoe.id.toUpperCase()}\` \n` +
-                                  `📏 *SIZE:*   \`US ${session.data.size}\` \n` +
+                                  `👟 *MODEL:* _${session.data.shoe.name}_\n` +
+                                  `📏 *SIZE:* \`${session.data.size}\` \n` +
                                   `👤 *CLIENT:* _${session.data.customerName}_\n` +
-                                  `📍 *HUB:*    _${session.data.location}_\n` +
+                                  `📍 *HUB:* _${session.data.location}_\n` +
                                   `────────────────────\n` +
                                   `💰 Base Price : KSh ${session.data.shoe.price.toLocaleString()}\n` +
                                   `📦 Freight Fee : KSh ${session.data.shippingCost.toLocaleString()}\n` +
                                   `────────────────────\n` +
-                                  `💵 *TOTAL DUE:*  *KSh ${session.data.totalBill.toLocaleString()}*\n\n` +
-                                  `🔥 To confirm this order and dispatch to administration, reply *YES*.\n` +
-                                  `❌ To abort tracking details, reply *CANCEL*.\n\n` +
+                                  `💵 *TOTAL DUE:* *KSh ${session.data.totalBill.toLocaleString()}*\n\n` +
+                                  `🔥 To confirm order, reply *YES*.\n` +
+                                  `❌ To abort, reply *CANCEL*.\n\n` +
                                   `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
                                   `⚡ *Powered by CymorTechServices*`;
             
@@ -309,39 +302,29 @@ async function handleOrderWorkflow(sock, to, text) {
             if (text === 'yes') {
                 const finalData = session.data;
                 const clientPhoneFormatted = to.split('@')[0];
-
-                // 1. Generate Manifest Notification Packet for Store Owner
                 const ownerManifest = `🚨 ━━━━━━━━━━━━━━━━━ 🚨\n` +
-                                      `⚡ *𝖡𝖮𝖳 𝖮𝖱𝖣𝖤𝖱 𝖱𝖮𝖴𝖳𝖨𝖭𝖦 𝖲𝖧𝖤𝖤𝖳* ⚡\n` +
-                                      `🚨 ━━━━━━━━━━━━━━━━━ 🚨\n\n` +
-                                      `An automated sales checkout has completed. Intercept to collect payments:\n\n` +
+                                      `⚡ *𝖡𝖮𝖳 𝖮𝖱𝖣𝖤𝖱 𝖱𝖮𝖴𝖳𝖨𝖭𝖦 𝖲𝖧𝖤𝖤𝖳* ⚡\n\n` +
                                       `👤 *CLIENT:* ${finalData.customerName}\n` +
                                       `📞 *CHATLINK:* wa.me/${clientPhoneFormatted}\n` +
-                                      `👟 *PRODUCT:* ${finalData.shoe.name} (\`${finalData.shoe.id.toUpperCase()}\`)\n` +
-                                      `📏 *SIZE RUN:* US ${finalData.size}\n` +
+                                      `👟 *PRODUCT:* ${finalData.shoe.name}\n` +
+                                      `📏 *SIZE:* ${finalData.size}\n` +
                                       `📍 *SHIPPING:* ${finalData.location}\n` +
                                       `💰 *NET BILL:* *KSh ${finalData.totalBill.toLocaleString()}*\n\n` +
-                                      `────────────────────\n` +
-                                      `👉 Click the WhatsApp profile link above to drop payment validation criteria and dispatch tracking references instantly.`;
+                                      `👉 Click the link above to lock payment.`;
 
-                // Forward structural telemetry log payload packet straight to owner DM route channel
                 const cleanOwnerJid = `${OWNER_NUMBER.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
                 await sock.sendMessage(cleanOwnerJid, { text: ownerManifest });
 
-                // 2. Reply to customer confirming queue dispatch placement 
                 await sock.sendMessage(to, { 
                     text: `🎉 *𝖮𝖱𝖣𝖤𝖱 𝖲𝖤𝖢𝖴𝖱𝖤𝖫𝖸 𝖫𝖮𝖢𝖪𝖤𝖣!* 🎉\n\n` +
-                          `Excellent, your purchase manifest has been routed directly into our active processing ledger.\n\n` +
-                          `💬 Our sales controller is opening your chat right now to finalize your delivery dispatch tracker details.\n\n` +
+                          `Our sales controller is opening your chat right now to finalize delivery details.\n\n` +
                           `Thank you for shopping with *${BOT_NAME}*! 🙌\n\n` +
                           `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
                           `⚡ *Powered by CymorTechServices*` 
                 });
-
-                // Flush user state session cache memory cleanly
                 userSessions.delete(to);
             } else {
-                await sock.sendMessage(to, { text: `✍️ Validation Error: Please type *YES* to execute order submission or *CANCEL* to clear:` });
+                await sock.sendMessage(to, { text: `✍️ Please type *YES* to submit or *CANCEL* to clear.` });
             }
             break;
     }
