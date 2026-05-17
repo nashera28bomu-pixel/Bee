@@ -1,16 +1,15 @@
 {
-  "name": "cymor-news-hub",
+  "name": "cymor-shoe-store-bot",
   "version": "1.0.0",
-  "description": "24/7 live news platform",
-  "main": "server.js",
+  "description": "Premium WhatsApp Business Automation SaaS Powered by Cymor",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node index.js"
   },
   "dependencies": {
-    "axios": "^1.7.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "rss-parser": "^3.13.0"
-  }
+    "@whiskeysockets/baileys": "^6.6.0",
+    "pino": "^8.19.0"
+  },
+  "author": "Simion Nashera",
+  "license": "MIT"
 }
