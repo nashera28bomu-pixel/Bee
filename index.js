@@ -5,16 +5,17 @@ const {
     useMultiFileAuthState,
     DisconnectReason,
     fetchLatestBaileysVersion,
-    makeCacheableSignalKeyStore
+    makeCacheableSignalKeyStore,
+    Browsers
 } = require('@whiskeysockets/baileys');
 
 const pino = require('pino');
-const http = require('http'); // Required for Keep-Alive
+const http = require('http');
 const NodeCache = require('node-cache');
 const { handleIncomingMessage } = require('./botLogic');
 const { BOT_NAME } = require('./config');
 
-// Message retry cache
+// Message retry cache - essential for preventing "Waiting for message" errors
 const msgRetryCounterCache = new NodeCache();
 
 // Global flags
@@ -38,17 +39,22 @@ async function startCymorBot() {
             version,
             auth: {
                 creds: state.creds,
+                // Optimized signal key store for faster decryption
                 keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
             },
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
-            browser: ["Ubuntu", "Chrome", "20.0.0"], 
+            // Updated browser string for better stability
+            browser: Browsers.ubuntu('Chrome'), 
             markOnlineOnConnect: true,
             syncFullHistory: false,
-            defaultQueryTimeoutMs: 90000,
-            connectTimeoutMs: 90000,
-            keepAliveIntervalMs: 30000,
-            msgRetryCounterCache
+            // Standard timeouts for Railway/Render environments
+            defaultQueryTimeoutMs: 60000,
+            connectTimeoutMs: 60000,
+            keepAliveIntervalMs: 15000,
+            msgRetryCounterCache,
+            // Ensure bot can generate high-quality previews
+            generateHighQualityLinkPreview: true 
         });
 
         // 4. CONNECTION EVENTS
@@ -60,20 +66,20 @@ async function startCymorBot() {
                 console.log(`✅ ${BOT_NAME} Connected Successfully`);
                 console.log('========================================\n');
                 pairingCodeRequested = false;
-                return;
             }
 
             // PAIRING LOGIC
             if (connection === 'connecting' && !sock.authState.creds.registered && !pairingCodeRequested) {
                 const phoneNumber = process.env.PAIRING_NUMBER;
                 if (!phoneNumber) {
-                    console.error('❌ PAIRING_NUMBER missing in environment variables.');
+                    console.error('❌ PAIRING_NUMBER missing in .env file.');
                     return;
                 }
 
                 pairingCodeRequested = true;
                 const formattedNumber = phoneNumber.replace(/\D/g, '');
 
+                // Delay to ensure socket is ready for request
                 setTimeout(async () => {
                     try {
                         console.log(`🔄 Requesting Pairing Code for: +${formattedNumber}`);
@@ -89,19 +95,17 @@ async function startCymorBot() {
                 }, 5000);
             }
 
-            // DISCONNECTION LOGIC
+            // RECONNECTION LOGIC
             if (connection === 'close') {
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const reason = lastDisconnect?.error?.message;
+                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
                 
-                console.log(`⚠️ Connection Closed. Status: ${statusCode} (${reason})`);
+                console.log(`⚠️ Connection Closed. Reconnecting: ${shouldReconnect}`);
 
-                if (statusCode === DisconnectReason.loggedOut) {
-                    console.error('❌ Session Logged Out. Please delete auth_info and pair again.');
-                    process.exit(1); 
+                if (shouldReconnect) {
+                    startCymorBot();
                 } else {
-                    console.log('🔄 Attempting to reconnect...');
-                    setTimeout(() => startCymorBot(), 5000);
+                    console.error('❌ Session Logged Out. Delete auth_info and restart.');
+                    process.exit(1);
                 }
             }
         });
@@ -109,23 +113,15 @@ async function startCymorBot() {
         // 5. SAVE CREDS
         sock.ev.on('creds.update', saveCreds);
 
-        // 6. MESSAGE HANDLER
+        // 6. UPDATED MESSAGE HANDLER
         sock.ev.on('messages.upsert', async (chatUpdate) => {
             try {
-                const msg = chatUpdate.messages?.[0];
-                if (!msg || !msg.message) return;
-
-                // Log the incoming message to Railway Terminal for debugging
-                console.log(`📩 New message from ${msg.key.remoteJid}: ${JSON.stringify(msg.message)}`);
-
-                // Ignore status broadcasts
-                if (msg.key.remoteJid === 'status@broadcast') return;
-
-                // Process the message (including messages from yourself)
-                await handleIncomingMessage(sock, msg);
+                // Pass the ENTIRE chatUpdate object to the handler
+                // The handler now manages the messages[0] array internally
+                await handleIncomingMessage(sock, chatUpdate);
 
             } catch (error) {
-                console.error('❌ Message Error:', error.message);
+                console.error('❌ Handler Error:', error.message);
             }
         });
 
@@ -136,22 +132,18 @@ async function startCymorBot() {
 }
 
 // ======================================================
-// KEEP ALIVE SERVER
+// KEEP ALIVE SERVER (Railway Health Check)
 // ======================================================
-
 const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Cymor Engine is Running...\n');
+    res.writeHead(200);
+    res.end(`${BOT_NAME} is active.`);
 });
 
 const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, () => {
-    console.log(`📡 Keep-alive server listening on port ${PORT}`);
-});
+server.listen(PORT);
 
 // Global Exception Handling
-process.on('uncaughtException', (err) => console.error('Uncaught:', err));
-process.on('unhandledRejection', (res) => console.error('Unhandled Rejection:', res));
+process.on('uncaughtException', (err) => console.error('Uncaught Exception:', err));
+process.on('unhandledRejection', (reason) => console.error('Unhandled Rejection:', reason));
 
 startCymorBot();
