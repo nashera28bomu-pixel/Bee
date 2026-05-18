@@ -18,14 +18,34 @@ const { BOT_NAME } = require('./config');
 const msgRetryCounterCache = new NodeCache();
 let pairingCodeRequested = false;
 
+// ======================================================
+// 1. START THE WEB SERVER FIRST (CRITICAL FOR RAILWAY)
+// ======================================================
+const PORT = process.env.PORT || 8080;
+
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Cymor Shoe Store Engine is Online');
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log('\n========================================');
+    console.log(`📡 RAILWAY HEALTH CHECK LIVE: PORT ${PORT}`);
+    console.log('========================================\n');
+    
+    // Only start the bot AFTER the server is live
+    startCymorBot();
+});
+
+// ======================================================
+// 2. MAIN BOT ENGINE
+// ======================================================
 async function startCymorBot() {
     try {
-        console.log('\n========================================');
-        console.log(`🚀 Starting ${BOT_NAME} Engine`);
-        console.log('========================================\n');
-
         const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
         const { version } = await fetchLatestBaileysVersion();
+
+        console.log(`🚀 Starting ${BOT_NAME} Engine...`);
 
         const sock = makeWASocket({
             version,
@@ -41,8 +61,7 @@ async function startCymorBot() {
             defaultQueryTimeoutMs: 60000,
             connectTimeoutMs: 60000,
             keepAliveIntervalMs: 15000,
-            msgRetryCounterCache,
-            generateHighQualityLinkPreview: true 
+            msgRetryCounterCache
         });
 
         sock.ev.on('connection.update', async (update) => {
@@ -57,11 +76,8 @@ async function startCymorBot() {
 
             if (connection === 'close') {
                 const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                if (shouldReconnect) {
-                    startCymorBot();
-                } else {
-                    process.exit(1);
-                }
+                console.log(`⚠️ Connection Closed. Reconnecting: ${shouldReconnect}`);
+                if (shouldReconnect) startCymorBot();
             }
         });
 
@@ -81,28 +97,6 @@ async function startCymorBot() {
     }
 }
 
-// ======================================================
-// THE RAILWAY FIX: SERVER BINDING
-// ======================================================
-
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Bot is running');
-});
-
-// 1. Check process.env.PORT first (Railway standard)
-// 2. Default to 8080 if not found (matching your log)
-const PORT = process.env.PORT || 8080;
-
-server.listen(PORT, '0.0.0.0', () => {
-    console.log('========================================');
-    console.log(`📡 SERVER LIVE ON PORT: ${PORT}`);
-    console.log('========================================');
-});
-
-// Error handling for the server itself
-server.on('error', (e) => {
-    console.error('Server error:', e);
-});
-
-startCymorBot();
+// Global Exception Handling
+process.on('uncaughtException', (err) => console.error('Uncaught:', err));
+process.on('unhandledRejection', (res) => console.error('Unhandled Rejection:', res));
