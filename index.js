@@ -39,21 +39,17 @@ async function startCymorBot() {
             version,
             auth: {
                 creds: state.creds,
-                // Optimized signal key store for faster decryption
                 keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
             },
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
-            // Updated browser string for better stability
             browser: Browsers.ubuntu('Chrome'), 
             markOnlineOnConnect: true,
             syncFullHistory: false,
-            // Standard timeouts for Railway/Render environments
             defaultQueryTimeoutMs: 60000,
             connectTimeoutMs: 60000,
             keepAliveIntervalMs: 15000,
             msgRetryCounterCache,
-            // Ensure bot can generate high-quality previews
             generateHighQualityLinkPreview: true 
         });
 
@@ -79,7 +75,6 @@ async function startCymorBot() {
                 pairingCodeRequested = true;
                 const formattedNumber = phoneNumber.replace(/\D/g, '');
 
-                // Delay to ensure socket is ready for request
                 setTimeout(async () => {
                     try {
                         console.log(`🔄 Requesting Pairing Code for: +${formattedNumber}`);
@@ -117,7 +112,6 @@ async function startCymorBot() {
         sock.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 // Pass the ENTIRE chatUpdate object to the handler
-                // The handler now manages the messages[0] array internally
                 await handleIncomingMessage(sock, chatUpdate);
 
             } catch (error) {
@@ -132,15 +126,20 @@ async function startCymorBot() {
 }
 
 // ======================================================
-// KEEP ALIVE SERVER (Railway Health Check)
+// KEEP ALIVE SERVER (Fixed for Railway Health Checks)
 // ======================================================
 const server = http.createServer((req, res) => {
-    res.writeHead(200);
-    res.end(`${BOT_NAME} is active.`);
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end(`${BOT_NAME} Engine Status: Online\n`);
 });
 
+// Railway provides the PORT variable automatically
 const PORT = process.env.PORT || 3000;
-server.listen(PORT);
+
+// CRITICAL: We bind to '0.0.0.0' so Railway can see the server
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`📡 Keep-alive server listening on port ${PORT}`);
+});
 
 // Global Exception Handling
 process.on('uncaughtException', (err) => console.error('Uncaught Exception:', err));
