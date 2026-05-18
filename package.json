@@ -1,9 +1,10 @@
 {
   "name": "cymor-shoe-store-bot",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Enterprise-grade WhatsApp Business Automation SaaS powered by CymorTechServices",
   "main": "index.js",
   "type": "commonjs",
+  "private": true,
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
@@ -24,11 +25,12 @@
   "author": "Simion Nashera",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "latest",
+    "@whiskeysockets/baileys": "^6.7.7",
+    "dotenv": "^16.4.5",
     "node-cache": "^5.1.2",
-    "pino": "^9.0.0"
+    "pino": "^9.3.2"
   }
 }
