@@ -8,36 +8,38 @@ const pino = require('pino');
 const { handleIncomingMessage } = require('./botLogic');
 const { BOT_NAME } = require('./config');
 
+// Prevent multiple requests in the same session
+let pairingCodeRequested = false;
+
 async function startCymorBot() {
-    // 1. Manage authentication state
     const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
 
-    // 2. Initialize WhatsApp Socket
     const sock = makeWASocket({
         logger: pino({ level: 'silent' }),
         printQRInTerminal: false,
         auth: state,
-        browser: ['Ubuntu', 'Chrome', '20.0.04'],
-        syncFullHistory: false // Speed up connection on cloud
+        // Using a standard Chrome browser string helps prevent connection drops
+        browser: ["Ubuntu", "Chrome", "20.0.04"],
+        syncFullHistory: false
     });
 
-    // 3. Connection & Pairing Logic
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
-        // --- PAIRING CODE HANDLER ---
-        // We trigger this only if we aren't registered AND the connection is "connecting" or "open"
-        if (!sock.authState.creds.registered && !qr) {
-            console.log(`==================================================`);
+        // --- FIXED PAIRING LOGIC ---
+        if (!sock.authState.creds.registered && !pairingCodeRequested) {
+            pairingCodeRequested = true; // Lock the gate
+            
+            console.log(`\n==================================================`);
             console.log(`      🚀 WELCOME TO ${BOT_NAME.toUpperCase()} SERVICE`);
             console.log(`==================================================\n`);
+
+            // Wait for network stabilization on Render
+            await delay(10000); 
 
             const phoneNumber = "254784074568";
             const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
 
-            // We add a small retry loop to ensure the socket is active before requesting
-            await delay(5000); 
-            
             try {
                 console.log(`🔄 Requesting Pairing Code for +${formattedNumber}...`);
                 const code = await sock.requestPairingCode(formattedNumber);
@@ -47,15 +49,16 @@ async function startCymorBot() {
                 console.log(`2. Select 'Link with phone number instead'.`);
                 console.log(`3. Enter the code shown above.\n`);
             } catch (error) {
-                console.error('❌ Pairing Error (Retrying in 10s...):', error.message);
-                setTimeout(() => startCymorBot(), 10000);
+                console.error('❌ Pairing Error:', error.message);
+                pairingCodeRequested = false; // Reset if it actually failed
             }
         }
 
-        // --- RECONNECTION LOGIC ---
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) {
+                // If connection closes while requesting, reset the flag so it can try again on reboot
+                pairingCodeRequested = false;
                 console.log('⚠️ Connection lost. Rebooting engine...');
                 startCymorBot();
             } else {
@@ -66,10 +69,8 @@ async function startCymorBot() {
         }
     });
 
-    // 4. Save Credentials
     sock.ev.on('creds.update', saveCreds);
 
-    // 5. Message Listener
     sock.ev.on('messages.upsert', async (chatUpdate) => {
         try {
             const msg = chatUpdate.messages[0];
@@ -81,7 +82,6 @@ async function startCymorBot() {
     });
 }
 
-// Global Safety Nets
 process.on('uncaughtException', (err) => console.error('System Error:', err));
 process.on('unhandledRejection', (err) => console.error('System Promise Error:', err));
 
