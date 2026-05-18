@@ -1,333 +1,767 @@
-const { BOT_NAME, OWNER_NUMBER, SHOE_CATALOG, DELIVERY_AREAS, FAQ_DATA } = require('./config');
+const {
+    BOT_NAME,
+    OWNER_NUMBER,
+    SHOE_CATALOG,
+    DELIVERY_AREAS,
+    FAQ_DATA
+} = require('./config');
 
-// In-memory session tracker to handle the order configuration funnel state
+// ======================================================
+// CYMOR PREMIUM BUSINESS ENGINE
+// Advanced SaaS WhatsApp Commerce Logic
+// ======================================================
+
+// Active checkout sessions
 const userSessions = new Map();
 
-/**
- * Main incoming message router
- */
+// Anti-spam cooldown tracker
+const cooldowns = new Map();
+
+// ======================================================
+// MAIN MESSAGE ENTRY
+// ======================================================
+
 async function handleIncomingMessage(sock, msg) {
-    const from = msg.key.remoteJid;
-    
-    // We only process individual chats for this business logic
-    if (!from.endsWith('@s.whatsapp.net')) return;
 
-    // Extract incoming text string from various message payload structures
-    const body = msg.message.conversation || 
-                 msg.message.extendedTextMessage?.text || 
-                 msg.message.buttonsResponseMessage?.selectedButtonId || 
-                 '';
-    
-    const cleanText = body.trim().toLowerCase();
-    const senderName = msg.pushName || 'Valued Customer';
+    try {
 
-    // If user is inside an active checkout session funnel, bypass the main menu rules
-    if (userSessions.has(from)) {
-        await handleOrderWorkflow(sock, from, cleanText);
-        return;
-    }
+        const from = msg.key.remoteJid;
 
-    // --- MAIN ROUTER SWITCH ---
-    switch (cleanText) {
-        case 'hi':
-        case 'hello':
-        case 'habari':
-        case 'menu':
-        case 'bot':
-            await sendMainMenu(sock, from, senderName);
-            break;
+        // Ignore groups
+        if (!from.endsWith('@s.whatsapp.net')) {
+            return;
+        }
 
-        case '1': // View Shoe Catalog
-            await sendCatalog(sock, from);
-            break;
+        // ======================================================
+        // EXTRACT MESSAGE TEXT
+        // ======================================================
 
-        case '2': // Start Order Funnel
-            userSessions.set(from, { stage: 'SELECT_SHOE', data: {} });
-            await sendCatalog(sock, from);
-            await sock.sendMessage(from, { 
-                text: `✨ *𝖢𝖸𝖬𝖮𝖱 𝖢𝖧𝖤𝖢𝖪𝖮𝖴𝖳* ✨\n\n` +
-                      `👟 *Let's get your order premium-configured!*\n\n` +
-                      `💬 Please type the *𝖨𝗍𝖾𝗆 𝖢𝗈𝖽𝖾* of the shoe you want to purchase (e.g., *CS01*):\n\n` +
-                      `_To abort checkout anytime, type *cancel*_\n` +
-                      `▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️\n` +
-                      `⚡ *Powered by CymorTechServices*`
-            });
-            break;
+        const body =
+            msg.message?.conversation ||
+            msg.message?.extendedTextMessage?.text ||
+            msg.message?.imageMessage?.caption ||
+            msg.message?.videoMessage?.caption ||
+            msg.message?.buttonsResponseMessage?.selectedButtonId ||
+            msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+            '';
 
-        case '3': // Delivery & Timelines Info
-            await sendDeliveryInfo(sock, from);
-            break;
+        const cleanText = body.trim().toLowerCase();
 
-        case '4': // Store Locations & Timings
-            await sendStoreInfo(sock, from);
-            break;
+        // Ignore empty messages
+        if (!cleanText) return;
 
-        case '5': // Mode of Payment FAQ
-            await sendPaymentInfo(sock, from);
-            break;
+        const senderName = msg.pushName || 'Customer';
 
-        default:
-            // Fallback checking for casual keyword matching
-            if (cleanText.includes('location') || cleanText.includes('where')) {
-                await sendStoreInfo(sock, from);
-            } else if (cleanText.includes('pay') || cleanText.includes('mpesa')) {
-                await sendPaymentInfo(sock, from);
-            } else if (cleanText.includes('delivery') || cleanText.includes('ship')) {
-                await sendDeliveryInfo(sock, from);
-            } else {
-                // Gentle guiding prompt error response
-                await sock.sendMessage(from, { 
-                    text: `⚠️ *𝖲𝖸𝖲𝖳𝖤𝖬 𝖭𝖮𝖳𝖨𝖥𝖨𝖢𝖳𝖨𝖮𝖭*\n\n` +
-                          `🤔 Sorry, I didn't quite catch that input.\n\n` +
-                          `📝 Type *'menu'* at any time to return to our main service navigation dashboard.\n\n` +
-                          `▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️\n` +
-                          `⚡ *Powered by CymorTechServices*` 
-                });
+        // ======================================================
+        // SIMPLE ANTISPAM
+        // ======================================================
+
+        const now = Date.now();
+
+        if (cooldowns.has(from)) {
+
+            const lastMessage = cooldowns.get(from);
+
+            if (now - lastMessage < 700) {
+                return;
             }
-            break;
+        }
+
+        cooldowns.set(from, now);
+
+        // ======================================================
+        // ACTIVE CHECKOUT SESSION
+        // ======================================================
+
+        if (userSessions.has(from)) {
+            await handleOrderWorkflow(
+                sock,
+                from,
+                cleanText,
+                senderName
+            );
+
+            return;
+        }
+
+        // ======================================================
+        // MAIN ROUTER
+        // ======================================================
+
+        switch (cleanText) {
+
+            // ======================================================
+            // MAIN MENU
+            // ======================================================
+
+            case 'hi':
+            case 'hello':
+            case 'hey':
+            case 'start':
+            case 'menu':
+            case 'bot':
+            case 'habari':
+            case 'mambo':
+
+                await sendMainMenu(sock, from, senderName);
+                break;
+
+            // ======================================================
+            // CATALOG
+            // ======================================================
+
+            case '1':
+            case 'catalog':
+            case 'shop':
+            case 'products':
+
+                await sendCatalog(sock, from);
+                break;
+
+            // ======================================================
+            // ORDER FLOW
+            // ======================================================
+
+            case '2':
+            case 'buy':
+            case 'order':
+
+                userSessions.set(from, {
+                    stage: 'SELECT_SHOE',
+                    data: {},
+                    startedAt: Date.now()
+                });
+
+                await sendCatalog(sock, from);
+
+                await sendText(
+                    sock,
+                    from,
+                    `🛍️ *PREMIUM CHECKOUT INITIALIZED*\n\n` +
+                    `Please type the *Product Code* of the sneaker you want.\n\n` +
+                    `📌 Example: *CS01*\n\n` +
+                    `❌ Type *cancel* anytime to stop checkout.`
+                );
+
+                break;
+
+            // ======================================================
+            // DELIVERY
+            // ======================================================
+
+            case '3':
+            case 'delivery':
+            case 'shipping':
+
+                await sendDeliveryInfo(sock, from);
+                break;
+
+            // ======================================================
+            // STORE INFO
+            // ======================================================
+
+            case '4':
+            case 'location':
+            case 'store':
+
+                await sendStoreInfo(sock, from);
+                break;
+
+            // ======================================================
+            // PAYMENT
+            // ======================================================
+
+            case '5':
+            case 'payment':
+            case 'mpesa':
+
+                await sendPaymentInfo(sock, from);
+                break;
+
+            // ======================================================
+            // HELP
+            // ======================================================
+
+            case 'help':
+
+                await sendHelpMenu(sock, from);
+                break;
+
+            // ======================================================
+            // FALLBACK AI-LIKE MATCHING
+            // ======================================================
+
+            default:
+
+                if (
+                    cleanText.includes('shoe') ||
+                    cleanText.includes('sneaker')
+                ) {
+                    await sendCatalog(sock, from);
+                    return;
+                }
+
+                if (
+                    cleanText.includes('pay') ||
+                    cleanText.includes('till')
+                ) {
+                    await sendPaymentInfo(sock, from);
+                    return;
+                }
+
+                if (
+                    cleanText.includes('deliver') ||
+                    cleanText.includes('shipping')
+                ) {
+                    await sendDeliveryInfo(sock, from);
+                    return;
+                }
+
+                if (
+                    cleanText.includes('where') ||
+                    cleanText.includes('located')
+                ) {
+                    await sendStoreInfo(sock, from);
+                    return;
+                }
+
+                await sendText(
+                    sock,
+                    from,
+                    `⚠️ *UNKNOWN COMMAND*\n\n` +
+                    `I couldn't understand your request.\n\n` +
+                    `📌 Type *menu* to access the control dashboard.`
+                );
+
+                break;
+        }
+
+    } catch (error) {
+
+        console.error('\n❌ BOT LOGIC ERROR');
+        console.error(error);
+
     }
 }
 
-// --- UI / COMPONENT GENERATORS ---
+// ======================================================
+// MAIN MENU
+// ======================================================
 
 async function sendMainMenu(sock, to, name) {
-    const menuText = `✦ ━━━━━━━━━━━━━━━━━ ✦\n` +
-                     `⚡ *𝖶𝖤𝖫𝖢𝖮𝖬𝖤 𝖳𝖮 ${BOT_NAME.toUpperCase()}* ⚡\n` +
-                     `✦ ━━━━━━━━━━━━━━━━━ ✦\n\n` +
-                     `👋 Hello *${name}*,\n\n` +
-                     `Welcome to Kenya's premium destination for verified, elite-tier authentic streetwear & sneakers.\n\n` +
-                     `▫️ *𝖲𝖤𝖫𝖤𝖢𝖳 𝖠𝖭 𝖮𝖯𝖳𝖨𝖮𝖭:* ▫️\n` +
-                     `Reply with the number *(1 - 5)* to navigate:\n\n` +
-                     `  *[1]* 👟  𝖵𝗂𝖾𝖿 𝖫𝖺𝗍𝖾𝗌𝗍 𝖲𝗇𝖾𝖺𝗄𝖾𝗋 𝖢𝖺𝗍𝖺𝗅𝗈𝗀\n` +
-                     `  *[2]* 🛍️  𝖯𝗅𝖺𝖼𝖾 𝖺 𝖭𝖾𝗐 𝖮𝗋𝖽𝖾𝗋 𝖨𝗇𝗌𝗍𝖺𝗇𝗍𝗅𝗒\n` +
-                     `  *[3]* 📦  𝖣𝖾𝗅𝗂𝗏𝖾𝗋𝗒 𝖱𝖺𝗍𝖾𝗌 & 𝖳𝗂𝗆𝖾𝗅𝗂𝖾𝗌\n` +
-                     `  *[4]* 📍  𝖯𝖧𝗒𝗌𝗂𝖼𝖺𝗅 𝖲𝗍𝗈𝗋𝖾 𝖧𝗎𝖻 & 𝖧𝗈𝗎𝗋𝗌\n` +
-                     `  *[5]* 💳  𝖯𝖺𝗒𝗆𝖾𝗇𝗍 𝖬𝖾𝗍𝗁𝗈𝖽𝗌 & 𝖯𝗈𝗅𝗂𝖼𝗂𝖾𝗌\n\n` +
-                     `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
-                     `⚡ *Powered by CymorTechServices*`;
-    
-    await sock.sendMessage(to, { text: menuText });
+
+    const text =
+`╔══════════════════╗
+   👟 *${BOT_NAME.toUpperCase()}*
+╚══════════════════╝
+
+👋 Welcome *${name}*
+
+Kenya's premium sneaker marketplace for authentic elite streetwear.
+
+━━━━━━━━━━━━━━━━━━
+
+*1️⃣ VIEW CATALOG*
+Browse latest sneaker inventory
+
+*2️⃣ PLACE ORDER*
+Launch instant checkout flow
+
+*3️⃣ DELIVERY INFO*
+Shipping rates & timelines
+
+*4️⃣ STORE LOCATION*
+Physical hub & opening hours
+
+*5️⃣ PAYMENT METHODS*
+M-Pesa & COD information
+
+━━━━━━━━━━━━━━━━━━
+
+💬 Reply with a number above.
+
+⚡ Powered by CymorTechServices`;
+
+    await sendText(sock, to, text);
 }
+
+// ======================================================
+// CATALOG
+// ======================================================
 
 async function sendCatalog(sock, to) {
-    let catalogText = `⚡ ━━━━━━━━━━━━━━━━━ ⚡\n` +
-                      `👟 *${BOT_NAME.toUpperCase()} 𝖢𝖠𝖳𝖠𝖫𝖮𝖦* 👟\n` +
-                      `⚡ ━━━━━━━━━━━━━━━━━ ⚡\n\n` +
-                      `Every pair is pristine and shipped in its original box packaging structure:\n\n`;
 
-    SHOE_CATALOG.forEach(shoe => {
-        catalogText += `┌─ 📦 *${shoe.name.toUpperCase()}*\n` +
-                       `│ 🆔 *Code:* ${shoe.id} \n` + // Removed backticks here to prevent syntax conflicts
-                       `│ 💰 *Price:* KSh ${shoe.price.toLocaleString()}\n` +
-                       `│ 📏 *Sizes:* [ ${shoe.sizes.join(' - ')} ]\n` +
-                       `│ ✨ *Availability:* ${shoe.instock ? '🟢 AVAILABLE' : '🔴 SOLD OUT'}\n` +
-                       `└───────────────────\n\n`;
+    let text =
+`👟 *${BOT_NAME.toUpperCase()} CATALOG*
+
+━━━━━━━━━━━━━━━━━━
+
+`;
+
+    SHOE_CATALOG.forEach((shoe) => {
+
+        text +=
+`📦 *${shoe.name}*
+
+🆔 Code: *${shoe.id}*
+💰 Price: *KSh ${shoe.price.toLocaleString()}*
+📏 Sizes: ${shoe.sizes.join(', ')}
+${shoe.instock ? '🟢 In Stock' : '🔴 Sold Out'}
+
+━━━━━━━━━━━━━━━━━━
+
+`;
     });
 
-    catalogText += `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
-                   `💡 *Ready to lock it in?*\n` +
-                   `Reply with *2* right now to launch your quick order checkout wizard.\n\n` +
-                   `⚡ *Powered by CymorTechServices*`;
+    text +=
+`🛍️ To order instantly:
+Reply with *2*
 
-    await sock.sendMessage(to, { text: catalogText });
+⚡ Powered by CymorTechServices`;
+
+    await sendText(sock, to, text);
 }
+
+// ======================================================
+// DELIVERY INFO
+// ======================================================
 
 async function sendDeliveryInfo(sock, to) {
-    const header = `📦 ━━━━━━━━━━━━━━━━━ 📦\n` +
-                   `⚡ *𝖫𝖮𝖦𝖨𝖲𝖳𝖨𝖢𝖲 & 𝖥𝖱𝖤𝖨𝖦𝖧𝖳 𝖱𝖠𝖳𝖤𝖲* ⚡\n` +
-                   `📦 ━━━━━━━━━━━━━━━━━ 📦\n\n` +
-                   `We provide rapid countrywide distribution networks daily:\n\n`;
 
-    let deliveryList = "```\n"; // Sanitized string for Render
-    for (const [zone, rate] of Object.entries(DELIVERY_AREAS)) {
-        const paddedZone = zone.toUpperCase().padEnd(15, ' ');
-        const formattedRate = rate === 0 ? "FREE" : `KSh ${rate}`;
-        deliveryList += `${paddedZone} : ${formattedRate}\n`;
+    let deliveryText =
+`📦 *DELIVERY & SHIPPING*
+
+━━━━━━━━━━━━━━━━━━
+
+`;
+
+    for (const [zone, price] of Object.entries(DELIVERY_AREAS)) {
+
+        deliveryText +=
+`📍 ${zone.toUpperCase()}
+💰 ${price === 0 ? 'FREE' : `KSh ${price}`}
+
+`;
     }
-    deliveryList += "```\n";
 
-    const footer = `⏱️ *𝖤𝖷𝖯𝖤𝖣𝖨𝖳𝖤𝖣 𝖳𝖨𝖬𝖤𝖫𝖨𝖭𝖤𝖲:*\n` +
-                   `• *Nairobi Environs:* Delivered within 2-3 hours max.\n` +
-                   `• *Countrywide:* Dispatched via Wells Fargo / G4S within 24 hours.\n\n` +
-                   `↩️ Reply *menu* to return to listings.\n` +
-                   `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
-                   `⚡ *Powered by CymorTechServices*`;
+    deliveryText +=
+`━━━━━━━━━━━━━━━━━━
 
-    await sock.sendMessage(to, { text: header + deliveryList + footer });
+🚚 Nairobi:
+2 - 3 Hours
+
+🚚 Countrywide:
+24 Hours Dispatch
+
+⚡ Powered by CymorTechServices`;
+
+    await sendText(sock, to, deliveryText);
 }
+
+// ======================================================
+// STORE INFO
+// ======================================================
 
 async function sendStoreInfo(sock, to) {
-    const storeText = `📍 ━━━━━━━━━━━━━━━━━ 📍\n` +
-                      `⚡ *𝖯𝖧𝖸𝖲𝖨𝖢𝖠𝖫 𝖧𝖴𝖡 & 𝖧𝖮𝖴𝖱𝖲* ⚡\n` +
-                      `📍 ━━━━━━━━━━━━━━━━━ 📍\n\n` +
-                      `🏢 *📍 LOCATION:* \n` +
-                      `_${FAQ_DATA.location}_\n\n` +
-                      `⏰ *⌛ OPERATING HOURS:* \n` +
-                      `• *Mon - Sat:* 8:00 AM – 8:00 PM\n` +
-                      `• *Sundays:* 11:00 AM – 4:00 PM\n\n` +
-                      `👟 Come try out your premium configurations live!\n\n` +
-                      `↩️ Reply *menu* to return to listings.\n` +
-                      `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
-                      `⚡ *Powered by CymorTechServices*`;
-    
-    await sock.sendMessage(to, { text: storeText });
+
+    const text =
+`📍 *STORE LOCATION*
+
+━━━━━━━━━━━━━━━━━━
+
+🏢 ${FAQ_DATA.location}
+
+⏰ OPENING HOURS
+
+Mon - Sat:
+8:00 AM - 8:00 PM
+
+Sunday:
+11:00 AM - 4:00 PM
+
+━━━━━━━━━━━━━━━━━━
+
+⚡ Powered by CymorTechServices`;
+
+    await sendText(sock, to, text);
 }
+
+// ======================================================
+// PAYMENT INFO
+// ======================================================
 
 async function sendPaymentInfo(sock, to) {
-    const paymentText = `💳 ━━━━━━━━━━━━━━━━━ 💳\n` +
-                        `⚡ *𝖲𝖤𝖢𝖴𝖱𝖤 𝖢𝖧𝖤𝖢𝖪𝖮𝖴𝖳 𝖦𝖠𝖳𝖤𝖶𝖠𝖸𝖲* ⚡\n` +
-                        `💳 ━━━━━━━━━━━━━━━━━ 💳\n\n` +
-                        `To guarantee ultimate transaction safety, we support:\n\n` +
-                        `🟩 *1. LIPA NA M-PESA (BUY GOODS)*\n` +
-                        `• Till Number:  *${FAQ_DATA.tillNumber}*\n` +
-                        `• Store Registry:  *${BOT_NAME}*\n\n` +
-                        `💵 *2. CASH ON DELIVERY (COD)*\n` +
-                        `• Restricted exclusively to Nairobi CBD and designated perimeter nodes.\n\n` +
-                        `⚠️ *Important:* Countrywide parcel dispatches require upfront delivery collateral settlement via our verified Business Till.\n\n` +
-                        `↩️ Reply *menu* to return to listings.\n` +
-                        `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
-                        `⚡ *Powered by CymorTechServices*`;
 
-    await sock.sendMessage(to, { text: paymentText });
+    const text =
+`💳 *PAYMENT METHODS*
+
+━━━━━━━━━━━━━━━━━━
+
+🟩 *M-PESA BUY GOODS*
+
+Till Number:
+*${FAQ_DATA.tillNumber}*
+
+Store Name:
+*${BOT_NAME}*
+
+━━━━━━━━━━━━━━━━━━
+
+💵 *CASH ON DELIVERY*
+
+Available within Nairobi selected zones only.
+
+━━━━━━━━━━━━━━━━━━
+
+⚠️ Countrywide deliveries require partial payment confirmation.
+
+⚡ Powered by CymorTechServices`;
+
+    await sendText(sock, to, text);
 }
 
-async function handleOrderWorkflow(sock, to, text) {
+// ======================================================
+// HELP MENU
+// ======================================================
+
+async function sendHelpMenu(sock, to) {
+
+    const text =
+`🆘 *HELP CENTER*
+
+━━━━━━━━━━━━━━━━━━
+
+Type:
+
+*menu* → Main dashboard
+*1* → Catalog
+*2* → Order
+*3* → Delivery
+*4* → Store location
+*5* → Payment info
+
+━━━━━━━━━━━━━━━━━━
+
+⚡ Powered by CymorTechServices`;
+
+    await sendText(sock, to, text);
+}
+
+// ======================================================
+// ORDER WORKFLOW
+// ======================================================
+
+async function handleOrderWorkflow(
+    sock,
+    to,
+    text,
+    senderName
+) {
+
     const session = userSessions.get(to);
 
-    if (text === 'cancel' || text === 'exit') {
+    // ======================================================
+    // CANCEL CHECKOUT
+    // ======================================================
+
+    if (
+        text === 'cancel' ||
+        text === 'exit'
+    ) {
+
         userSessions.delete(to);
-        await sock.sendMessage(to, { 
-            text: `❌ *𝖢𝖧𝖤𝖢𝖪𝖮𝖴𝖳 𝖳𝖤𝖱𝖬𝖨𝖭𝖠𝖳𝖤𝖣*\n\n` +
-                  `Your configuration session has been purged successfully.\n\n` +
-                  `📝 Reply *menu* to access the main interface dashboard.\n\n` +
-                  `▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️\n` +
-                  `⚡ *Powered by CymorTechServices*` 
-        });
+
+        await sendText(
+            sock,
+            to,
+            `❌ *CHECKOUT CANCELLED*\n\n` +
+            `Your active order session has been cleared.\n\n` +
+            `📌 Type *menu* to restart.`
+        );
+
         return;
     }
 
-    switch (session.stage) {
-        case 'SELECT_SHOE':
-            const selectedShoe = SHOE_CATALOG.find(s => s.id.toLowerCase() === text);
-            if (!selectedShoe || !selectedShoe.instock) {
-                await sock.sendMessage(to, { 
-                    text: `❌ *𝖨𝖭𝖵𝖠𝖫𝖨𝖣 𝖨𝖳𝖤𝖬 𝖢𝖮𝖣𝖤*\n\n` +
-                          `We couldn't track that active code or the item is sold out.\n` +
-                          `Please look at the catalog and re-enter a valid ID code:\n\n` +
-                          `_Or type *cancel* to return to main dashboard_` 
-                });
-                return;
+    // ======================================================
+    // SELECT SHOE
+    // ======================================================
+
+    if (session.stage === 'SELECT_SHOE') {
+
+        const selectedShoe = SHOE_CATALOG.find(
+            shoe =>
+                shoe.id.toLowerCase() ===
+                text.trim().toLowerCase()
+        );
+
+        if (!selectedShoe || !selectedShoe.instock) {
+
+            await sendText(
+                sock,
+                to,
+                `❌ Invalid or unavailable product code.\n\n` +
+                `Please enter a valid code like *CS01*.`
+            );
+
+            return;
+        }
+
+        session.data.shoe = selectedShoe;
+        session.stage = 'SELECT_SIZE';
+
+        await sendText(
+            sock,
+            to,
+            `✅ *${selectedShoe.name}* selected.\n\n` +
+            `📏 Available Sizes:\n` +
+            `${selectedShoe.sizes.join(', ')}\n\n` +
+            `Reply with your preferred size.`
+        );
+
+        return;
+    }
+
+    // ======================================================
+    // SELECT SIZE
+    // ======================================================
+
+    if (session.stage === 'SELECT_SIZE') {
+
+        const size = parseInt(text);
+
+        if (
+            isNaN(size) ||
+            !session.data.shoe.sizes.includes(size)
+        ) {
+
+            await sendText(
+                sock,
+                to,
+                `❌ Invalid size.\n\n` +
+                `Choose from:\n${session.data.shoe.sizes.join(', ')}`
+            );
+
+            return;
+        }
+
+        session.data.size = size;
+        session.stage = 'ENTER_NAME';
+
+        await sendText(
+            sock,
+            to,
+            `👤 Enter recipient full name.`
+        );
+
+        return;
+    }
+
+    // ======================================================
+    // ENTER NAME
+    // ======================================================
+
+    if (session.stage === 'ENTER_NAME') {
+
+        if (text.length < 3) {
+
+            await sendText(
+                sock,
+                to,
+                `❌ Please enter a valid name.`
+            );
+
+            return;
+        }
+
+        session.data.customerName = senderName;
+        session.stage = 'ENTER_LOCATION';
+
+        await sendText(
+            sock,
+            to,
+            `📍 Enter delivery location.\n\n` +
+            `Example:\nWestlands, Nairobi`
+        );
+
+        return;
+    }
+
+    // ======================================================
+    // ENTER LOCATION
+    // ======================================================
+
+    if (session.stage === 'ENTER_LOCATION') {
+
+        if (text.length < 3) {
+
+            await sendText(
+                sock,
+                to,
+                `❌ Invalid delivery location.`
+            );
+
+            return;
+        }
+
+        let shippingCost = 300;
+
+        for (const [zone, price] of Object.entries(DELIVERY_AREAS)) {
+
+            if (text.includes(zone.toLowerCase())) {
+                shippingCost = price;
+                break;
             }
-            session.data.shoe = selectedShoe;
-            session.stage = 'SELECT_SIZE';
-            await sock.sendMessage(to, { 
-                text: `✨ *𝖬𝖮𝖣𝖤𝖫 𝖫𝖮𝖢𝖪𝖤𝖣:* _${selectedShoe.name}_\n\n` +
-                      `📐 What *𝖲𝗂𝗓𝖾* do you require?\n\n` +
-                      `👉 Available sizing run: *[ ${selectedShoe.sizes.join(' - ')} ]*\n\n` +
-                      `▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️\n` +
-                      `⚡ *Powered by CymorTechServices*` 
-            });
-            break;
+        }
 
-        case 'SELECT_SIZE':
-            const enteredSize = parseInt(text);
-            const validSizes = session.data.shoe.sizes;
-            if (isNaN(enteredSize) || !validSizes.includes(enteredSize)) {
-                await sock.sendMessage(to, { 
-                    text: `❌ *𝖴𝖭𝖠𝖵𝖠𝖨𝖫𝖠𝖡𝖫𝖤 𝖲𝖨𝖹𝖤*\n\n` +
-                          `Please pick a sizing value directly from: *[ ${validSizes.join(' - ')} ]*:` 
-                });
-                return;
-            }
-            session.data.size = enteredSize;
-            session.stage = 'ENTER_NAME';
-            await sock.sendMessage(to, { 
-                text: `👤 *𝖲𝖨𝖹𝖤 𝖱𝖤𝖦𝖨𝖲𝖳𝖤𝖱𝖤𝖣:* _Size ${enteredSize}_\n\n` +
-                      `📝 Please provide the full *𝖭𝖺𝗆𝖾* of the recipient:` 
-            });
-            break;
+        session.data.location = text.toUpperCase();
+        session.data.shippingCost = shippingCost;
+        session.data.total =
+            session.data.shoe.price + shippingCost;
 
-        case 'ENTER_NAME':
-            if (text.length < 3) {
-                await sock.sendMessage(to, { text: `❌ Please enter a real name for shipping manifests:` });
-                return;
-            }
-            session.data.customerName = text.toUpperCase();
-            session.stage = 'ENTER_LOCATION';
-            await sock.sendMessage(to, { 
-                text: `📍 *𝖱𝖤𝖢𝖨𝖯𝖨𝖤𝖭𝖳 𝖲𝖤𝖳:* _${session.data.customerName}_\n\n` +
-                      `🚛 State your exact *𝖣𝖾𝗅𝗂𝗏𝖾𝗋𝗒 𝖫𝗈𝖼𝖺𝗍𝗂𝗈𝗇* (e.g., CBD, Westlands, Mombasa):` 
-            });
-            break;
+        session.stage = 'CONFIRM_ORDER';
 
-        case 'ENTER_LOCATION':
-            if (text.length < 3) {
-                await sock.sendMessage(to, { text: `❌ Please detail a robust delivery address:` });
-                return;
-            }
-            session.data.location = text.toUpperCase();
-            
-            let shippingCost = 300; 
-            for (const [zone, rate] of Object.entries(DELIVERY_AREAS)) {
-                if (text.includes(zone.toLowerCase())) {
-                    shippingCost = rate;
-                    break;
-                }
-            }
-            session.data.shippingCost = shippingCost;
-            session.data.totalBill = session.data.shoe.price + shippingCost;
+        const invoice =
+`🧾 *ORDER SUMMARY*
 
-            const clientInvoice = `🧾 ━━━━━━━━━━━━━━━━━ 🧾\n` +
-                                  `⚡ *𝖯𝖱𝖤𝖬𝖨𝖴𝖬 𝖨𝖭𝖵𝖮𝖨𝖢𝖤 𝖬𝖠𝖭𝖨𝖥𝖤𝖲𝖳* ⚡\n` +
-                                  `🧾 ━━━━━━━━━━━━━━━━━ 🧾\n\n` +
-                                  `👟 *MODEL:* _${session.data.shoe.name}_\n` +
-                                  `📏 *SIZE:* \`${session.data.size}\` \n` +
-                                  `👤 *CLIENT:* _${session.data.customerName}_\n` +
-                                  `📍 *HUB:* _${session.data.location}_\n` +
-                                  `────────────────────\n` +
-                                  `💰 Base Price : KSh ${session.data.shoe.price.toLocaleString()}\n` +
-                                  `📦 Freight Fee : KSh ${session.data.shippingCost.toLocaleString()}\n` +
-                                  `────────────────────\n` +
-                                  `💵 *TOTAL DUE:* *KSh ${session.data.totalBill.toLocaleString()}*\n\n` +
-                                  `🔥 To confirm order, reply *YES*.\n` +
-                                  `❌ To abort, reply *CANCEL*.\n\n` +
-                                  `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
-                                  `⚡ *Powered by CymorTechServices*`;
-            
-            session.stage = 'CONFIRM_ORDER';
-            await sock.sendMessage(to, { text: clientInvoice });
-            break;
+━━━━━━━━━━━━━━━━━━
 
-        case 'CONFIRM_ORDER':
-            if (text === 'yes') {
-                const finalData = session.data;
-                const clientPhoneFormatted = to.split('@')[0];
-                const ownerManifest = `🚨 ━━━━━━━━━━━━━━━━━ 🚨\n` +
-                                      `⚡ *𝖡𝖮𝖳 𝖮𝖱𝖣𝖤𝖱 𝖱𝖮𝖴𝖳𝖨𝖭𝖦 𝖲𝖧𝖤𝖤𝖳* ⚡\n\n` +
-                                      `👤 *CLIENT:* ${finalData.customerName}\n` +
-                                      `📞 *CHATLINK:* wa.me/${clientPhoneFormatted}\n` +
-                                      `👟 *PRODUCT:* ${finalData.shoe.name}\n` +
-                                      `📏 *SIZE:* ${finalData.size}\n` +
-                                      `📍 *SHIPPING:* ${finalData.location}\n` +
-                                      `💰 *NET BILL:* *KSh ${finalData.totalBill.toLocaleString()}*\n\n` +
-                                      `👉 Click the link above to lock payment.`;
+👟 Product:
+${session.data.shoe.name}
 
-                const cleanOwnerJid = `${OWNER_NUMBER.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
-                await sock.sendMessage(cleanOwnerJid, { text: ownerManifest });
+📏 Size:
+${session.data.size}
 
-                await sock.sendMessage(to, { 
-                    text: `🎉 *𝖮𝖱𝖣𝖤𝖱 𝖲𝖤𝖢𝖴𝖱𝖤𝖫𝖸 𝖫𝖮𝖢𝖪𝖤𝖣!* 🎉\n\n` +
-                          `Our sales controller is opening your chat right now to finalize delivery details.\n\n` +
-                          `Thank you for shopping with *${BOT_NAME}*! 🙌\n\n` +
-                          `▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️▪️\n` +
-                          `⚡ *Powered by CymorTechServices*` 
-                });
-                userSessions.delete(to);
-            } else {
-                await sock.sendMessage(to, { text: `✍️ Please type *YES* to submit or *CANCEL* to clear.` });
-            }
-            break;
+👤 Customer:
+${session.data.customerName}
+
+📍 Delivery:
+${session.data.location}
+
+━━━━━━━━━━━━━━━━━━
+
+💰 Product:
+KSh ${session.data.shoe.price.toLocaleString()}
+
+📦 Shipping:
+KSh ${shippingCost.toLocaleString()}
+
+━━━━━━━━━━━━━━━━━━
+
+💵 TOTAL:
+*KSh ${session.data.total.toLocaleString()}*
+
+━━━━━━━━━━━━━━━━━━
+
+✅ Reply *YES* to confirm
+❌ Reply *CANCEL* to abort`;
+
+        await sendText(sock, to, invoice);
+
+        return;
+    }
+
+    // ======================================================
+    // CONFIRM ORDER
+    // ======================================================
+
+    if (session.stage === 'CONFIRM_ORDER') {
+
+        if (text !== 'yes') {
+
+            await sendText(
+                sock,
+                to,
+                `✍️ Reply *YES* to confirm or *CANCEL* to abort.`
+            );
+
+            return;
+        }
+
+        const data = session.data;
+
+        const customerPhone =
+            to.split('@')[0];
+
+        // ======================================================
+        // OWNER ALERT
+        // ======================================================
+
+        const ownerText =
+`🚨 *NEW ORDER RECEIVED*
+
+━━━━━━━━━━━━━━━━━━
+
+👤 Customer:
+${data.customerName}
+
+📞 WhatsApp:
+wa.me/${customerPhone}
+
+👟 Product:
+${data.shoe.name}
+
+📏 Size:
+${data.size}
+
+📍 Delivery:
+${data.location}
+
+💰 Total:
+KSh ${data.total.toLocaleString()}
+
+━━━━━━━━━━━━━━━━━━
+
+⚡ Cymor Business Engine`;
+
+        const ownerJid =
+`${OWNER_NUMBER.replace(/\D/g, '')}@s.whatsapp.net`;
+
+        await sendText(
+            sock,
+            ownerJid,
+            ownerText
+        );
+
+        // ======================================================
+        // CUSTOMER CONFIRMATION
+        // ======================================================
+
+        await sendText(
+            sock,
+            to,
+            `🎉 *ORDER CONFIRMED*\n\n` +
+            `Our sales team will contact you shortly.\n\n` +
+            `Thank you for shopping with *${BOT_NAME}*.`
+        );
+
+        userSessions.delete(to);
     }
 }
 
-module.exports = { handleIncomingMessage };
+// ======================================================
+// SAFE MESSAGE SENDER
+// ======================================================
+
+async function sendText(sock, to, text) {
+
+    try {
+
+        await sock.sendMessage(to, {
+            text
+        });
+
+    } catch (error) {
+
+        console.error('\n❌ SEND MESSAGE ERROR');
+        console.error(error);
+
+    }
+}
+
+// ======================================================
+// EXPORTS
+// ======================================================
+
+module.exports = {
+    handleIncomingMessage
+};
