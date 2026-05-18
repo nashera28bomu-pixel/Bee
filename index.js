@@ -9,6 +9,7 @@ const {
 } = require('@whiskeysockets/baileys');
 
 const pino = require('pino');
+const http = require('http'); // Required for Keep-Alive
 const NodeCache = require('node-cache');
 const { handleIncomingMessage } = require('./botLogic');
 const { BOT_NAME } = require('./config');
@@ -120,7 +121,7 @@ async function startCymorBot() {
                 // Ignore status broadcasts
                 if (msg.key.remoteJid === 'status@broadcast') return;
 
-                // Process the message (even if fromMe is true)
+                // Process the message (including messages from yourself)
                 await handleIncomingMessage(sock, msg);
 
             } catch (error) {
@@ -133,6 +134,21 @@ async function startCymorBot() {
         setTimeout(() => startCymorBot(), 10000);
     }
 }
+
+// ======================================================
+// KEEP ALIVE SERVER
+// ======================================================
+
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Cymor Engine is Running...\n');
+});
+
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, () => {
+    console.log(`📡 Keep-alive server listening on port ${PORT}`);
+});
 
 // Global Exception Handling
 process.on('uncaughtException', (err) => console.error('Uncaught:', err));
