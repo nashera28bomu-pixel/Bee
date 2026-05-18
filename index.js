@@ -4,301 +4,134 @@ const {
     default: makeWASocket,
     useMultiFileAuthState,
     DisconnectReason,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    makeCacheableSignalKeyStore
 } = require('@whiskeysockets/baileys');
 
 const pino = require('pino');
 const NodeCache = require('node-cache');
-
 const { handleIncomingMessage } = require('./botLogic');
 const { BOT_NAME } = require('./config');
-
-// ======================================================
-// CYMOR WHATSAPP ENGINE
-// Railway Production Build
-// ======================================================
 
 // Message retry cache
 const msgRetryCounterCache = new NodeCache();
 
-// Pairing lock
+// Global flags
 let pairingCodeRequested = false;
 
-// Reconnect protection
-let reconnecting = false;
-
-// ======================================================
-// START BOT
-// ======================================================
-
 async function startCymorBot() {
-
     try {
-
         console.log('\n========================================');
         console.log(`🚀 Starting ${BOT_NAME} Engine`);
         console.log('========================================\n');
 
-        // ======================================================
-        // AUTH SESSION
-        // ======================================================
+        // 1. AUTH SESSION
+        const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
 
-        const {
-            state,
-            saveCreds
-        } = await useMultiFileAuthState('./auth_info');
+        // 2. FETCH LATEST VERSION
+        const { version, isLatest } = await fetchLatestBaileysVersion();
+        console.log(`📡 Using WA Version: ${version.join('.')} (Latest: ${isLatest})`);
 
-        // ======================================================
-        // BAILEYS VERSION
-        // ======================================================
-
-        const { version } =
-            await fetchLatestBaileysVersion();
-
-        // ======================================================
-        // SOCKET CONFIG
-        // ======================================================
-
+        // 3. SOCKET CONFIG
         const sock = makeWASocket({
-
             version,
-
-            auth: state,
-
-            logger: pino({
-                level: 'silent'
-            }),
-
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
+            },
+            logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
-
-            browser: ['CymorBot', 'Chrome', '2.0.0'],
-
+            // Optimized browser for pairing stability
+            browser: ["Ubuntu", "Chrome", "20.0.0"], 
             markOnlineOnConnect: true,
-
             syncFullHistory: false,
-
-            defaultQueryTimeoutMs: 60000,
-
-            connectTimeoutMs: 60000,
-
-            keepAliveIntervalMs: 10000,
-
-            generateHighQualityLinkPreview: true,
-
-            emitOwnEvents: false,
-
-            fireInitQueries: true,
-
-            retryRequestDelayMs: 250,
-
+            // Increased timeouts for Railway/Mobile stability
+            defaultQueryTimeoutMs: 90000,
+            connectTimeoutMs: 90000,
+            keepAliveIntervalMs: 30000,
             msgRetryCounterCache
         });
 
-        // ======================================================
-        // CONNECTION EVENTS
-        // ======================================================
-
+        // 4. CONNECTION EVENTS
         sock.ev.on('connection.update', async (update) => {
-
-            const {
-                connection,
-                lastDisconnect
-            } = update;
-
-            // ======================================================
-            // OPEN
-            // ======================================================
+            const { connection, lastDisconnect, qr } = update;
 
             if (connection === 'open') {
-
-                reconnecting = false;
-
                 console.log('\n========================================');
                 console.log(`✅ ${BOT_NAME} Connected Successfully`);
                 console.log('========================================\n');
-
+                pairingCodeRequested = false;
                 return;
             }
 
-            // ======================================================
-            // REQUEST PAIRING
-            // ======================================================
+            // PAIRING LOGIC
+            if (connection === 'connecting' && !sock.authState.creds.registered && !pairingCodeRequested) {
+                const phoneNumber = process.env.PAIRING_NUMBER;
+                if (!phoneNumber) {
+                    console.error('❌ PAIRING_NUMBER missing in environment variables.');
+                    return;
+                }
 
-            if (
-                connection === 'connecting' &&
-                !sock.authState.creds.registered &&
-                !pairingCodeRequested
-            ) {
+                pairingCodeRequested = true;
+                const formattedNumber = phoneNumber.replace(/\D/g, '');
 
-                try {
-
-                    pairingCodeRequested = true;
-
-                    const phoneNumber =
-                        process.env.PAIRING_NUMBER;
-
-                    if (!phoneNumber) {
-
-                        console.log(
-                            '❌ PAIRING_NUMBER missing in .env'
-                        );
-
-                        return;
+                // Delay pairing request slightly to ensure socket is ready
+                setTimeout(async () => {
+                    try {
+                        console.log(`🔄 Requesting Pairing Code for: +${formattedNumber}`);
+                        const code = await sock.requestPairingCode(formattedNumber);
+                        
+                        console.log('\n========================================');
+                        console.log(`🔑 YOUR PAIRING CODE: ${code}`);
+                        console.log('========================================\n');
+                    } catch (err) {
+                        console.error('❌ Failed to get pairing code:', err.message);
+                        pairingCodeRequested = false;
                     }
-
-                    const formattedNumber =
-                        phoneNumber.replace(/\D/g, '');
-
-                    console.log('🔄 Requesting Pairing Code...');
-                    console.log(`📱 Number: +${formattedNumber}\n`);
-
-                    const code =
-                        await sock.requestPairingCode(
-                            formattedNumber
-                        );
-
-                    console.log('\n========================================');
-                    console.log(`✅ YOUR PAIRING CODE: ${code}`);
-                    console.log('========================================\n');
-
-                    console.log('📌 HOW TO LINK');
-                    console.log('1. Open WhatsApp');
-                    console.log('2. Go to Linked Devices');
-                    console.log('3. Tap "Link with phone number instead"');
-                    console.log(`4. Enter code: ${code}\n`);
-
-                } catch (error) {
-
-                    pairingCodeRequested = false;
-
-                    console.error('\n❌ PAIRING ERROR');
-                    console.error(error?.message || error);
-
-                }
-            }
-
-            // ======================================================
-            // CLOSE
-            // ======================================================
-
-            if (connection === 'close') {
-
-                const statusCode =
-                    lastDisconnect?.error?.output?.statusCode;
-
-                const shouldReconnect =
-                    statusCode !== DisconnectReason.loggedOut;
-
-                console.log('\n⚠️ Connection Closed');
-                console.log(`📡 Status Code: ${statusCode}`);
-
-                // ======================================================
-                // LOGGED OUT
-                // ======================================================
-
-                if (!shouldReconnect) {
-
-                    console.log('\n❌ Session Logged Out');
-                    console.log(
-                        '🗑️ Delete auth_info folder and reconnect.\n'
-                    );
-
-                    return;
-                }
-
-                // ======================================================
-                // PREVENT RECONNECT SPAM
-                // ======================================================
-
-                if (reconnecting) {
-                    return;
-                }
-
-                reconnecting = true;
-
-                pairingCodeRequested = false;
-
-                console.log('\n🔄 Reconnecting in 5 seconds...\n');
-
-                setTimeout(() => {
-                    startCymorBot();
                 }, 5000);
             }
-        });
 
-        // ======================================================
-        // SAVE CREDS
-        // ======================================================
+            // DISCONNECTION LOGIC
+            if (connection === 'close') {
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const reason = lastDisconnect?.error?.message;
+                
+                console.log(`⚠️ Connection Closed. Status: ${statusCode} (${reason})`);
 
-        sock.ev.on('creds.update', saveCreds);
-
-        // ======================================================
-        // MESSAGE EVENTS
-        // ======================================================
-
-        sock.ev.on('messages.upsert', async (chatUpdate) => {
-
-            try {
-
-                const msg =
-                    chatUpdate.messages?.[0];
-
-                if (!msg) return;
-
-                // Ignore empty messages
-                if (!msg.message) return;
-
-                // Ignore bot's own messages
-                if (msg.key.fromMe) return;
-
-                // Ignore status broadcasts
-                if (msg.key.remoteJid === 'status@broadcast') {
-                    return;
+                if (statusCode === DisconnectReason.loggedOut) {
+                    console.error('❌ Session Logged Out. Please delete auth_info and pair again.');
+                    process.exit(1); 
+                } else {
+                    console.log('🔄 Attempting to reconnect...');
+                    setTimeout(() => startCymorBot(), 5000);
                 }
-
-                await handleIncomingMessage(sock, msg);
-
-            } catch (error) {
-
-                console.error('\n❌ MESSAGE HANDLER ERROR');
-                console.error(error);
-
             }
         });
 
-    } catch (error) {
+        // 5. SAVE CREDS
+        sock.ev.on('creds.update', saveCreds);
 
-        console.error('\n❌ BOT START ERROR');
-        console.error(error);
+        // 6. MESSAGE HANDLER
+        sock.ev.on('messages.upsert', async (chatUpdate) => {
+            try {
+                const msg = chatUpdate.messages?.[0];
+                if (!msg || !msg.message || msg.key.fromMe) return;
+                if (msg.key.remoteJid === 'status@broadcast') return;
 
-        console.log('\n🔄 Restarting bot in 10 seconds...\n');
+                await handleIncomingMessage(sock, msg);
+            } catch (error) {
+                console.error('❌ Message Error:', error.message);
+            }
+        });
 
-        setTimeout(() => {
-            startCymorBot();
-        }, 10000);
+    } catch (err) {
+        console.error('❌ Critical Engine Error:', err);
+        setTimeout(() => startCymorBot(), 10000);
     }
 }
 
-// ======================================================
-// GLOBAL ERROR HANDLERS
-// ======================================================
-
-process.on('uncaughtException', (error) => {
-
-    console.error('\n❌ UNCAUGHT EXCEPTION');
-    console.error(error);
-
-});
-
-process.on('unhandledRejection', (reason) => {
-
-    console.error('\n❌ UNHANDLED PROMISE REJECTION');
-    console.error(reason);
-
-});
-
-// ======================================================
-// START ENGINE
-// ======================================================
+// Global Exception Handling
+process.on('uncaughtException', (err) => console.error('Uncaught:', err));
+process.on('unhandledRejection', (res) => console.error('Unhandled Rejection:', res));
 
 startCymorBot();
