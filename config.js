@@ -1,15 +1,11 @@
+require('dotenv').config();
+
 /**
  * ============================================================
  * 🚀 CYMOR BUSINESS ENGINE — MASTER CONFIGURATION HUB
  * ============================================================
- * Project:
  * Enterprise WhatsApp Commerce Automation SaaS
- *
- * Architecture:
- * Modular scalable commerce configuration layer
- *
- * Maintainer:
- * CymorTechServices
+ * Powered by CymorTechServices
  * ============================================================
  */
 
@@ -19,26 +15,51 @@
 
 const SYSTEM_CONFIG = {
 
-    // Bot Identity
+    // ========================================================
+    // BRANDING
+    // ========================================================
+
     BOT_NAME: 'Cymor Shoe Store',
 
     SYSTEM_SIGNATURE: 'Powered by CymorTechServices',
 
-    VERSION: '2.0.0',
+    VERSION: '2.1.0',
 
-    ENVIRONMENT: 'production',
+    ENVIRONMENT:
+        process.env.NODE_ENV || 'production',
 
-    // Session settings
-    SESSION_TIMEOUT: 1000 * 60 * 15, // 15 minutes
+    // ========================================================
+    // OWNER SETTINGS
+    // ========================================================
 
-    // Default shipping if area not found
+    OWNER_NUMBER:
+        process.env.OWNER_NUMBER || '254700000000',
+
+    PAIRING_NUMBER:
+        process.env.PAIRING_NUMBER || '254700000000',
+
+    // ========================================================
+    // SESSION SETTINGS
+    // ========================================================
+
+    SESSION_TIMEOUT:
+        1000 * 60 * 15, // 15 mins
+
+    MAX_RETRIES: 3,
+
+    // ========================================================
+    // DELIVERY SETTINGS
+    // ========================================================
+
     DEFAULT_DELIVERY_FEE: 300,
 
-    // Currency
-    CURRENCY: 'KSh',
+    FREE_DELIVERY_THRESHOLD: 20000,
 
-    // Business owner routing number
-    OWNER_NUMBER: '254113821327'
+    // ========================================================
+    // CURRENCY
+    // ========================================================
+
+    CURRENCY: 'KSh'
 };
 
 // ============================================================
@@ -49,19 +70,32 @@ const STORE_INFO = {
 
     storeName: 'Cymor Luxury Hub',
 
-    slogan: 'Premium Streetwear & Sneaker Marketplace',
+    slogan:
+        'Premium Streetwear & Sneaker Marketplace',
 
     location:
         '4th Floor, Elegant Plaza, Kimathi Street, Nairobi CBD',
 
     businessHours: {
-        mondayToSaturday: '8:00 AM - 8:00 PM',
-        sunday: '11:00 AM - 4:00 PM'
+
+        mondayToSaturday:
+            '8:00 AM - 8:00 PM',
+
+        sunday:
+            '11:00 AM - 4:00 PM'
     },
 
-    supportContact: '+254113821327',
+    supportContact:
+        '+254712345678',
 
-    instagram: '@cymorshoes',
+    email:
+        'support@cymorstore.com',
+
+    instagram:
+        '@cymorshoes',
+
+    tiktok:
+        '@cymorshoes',
 
     deliveryPartners: [
         'Wells Fargo',
@@ -77,13 +111,24 @@ const STORE_INFO = {
 const PAYMENT_CONFIG = {
 
     mpesa: {
+
         enabled: true,
-        tillNumber: '5544332',
-        businessName: 'Cymor Shoe Store'
+
+        tillNumber:
+            process.env.MPESA_TILL ||
+            '5544332',
+
+        businessName:
+            'Cymor Shoe Store',
+
+        currency:
+            'KES'
     },
 
     cashOnDelivery: {
+
         enabled: true,
+
         supportedAreas: [
             'nairobi cbd',
             'westlands',
@@ -165,7 +210,8 @@ const SHOE_CATALOG = [
 
         category: 'Sneakers',
 
-        name: "Air Jordan 1 Retro High OG 'Chicago Lost & Found'",
+        name:
+            "Air Jordan 1 Retro High OG 'Chicago Lost & Found'",
 
         price: 14500,
 
@@ -173,7 +219,8 @@ const SHOE_CATALOG = [
 
         sizes: [40, 41, 42, 43, 44, 45],
 
-        color: 'Varsity Red / White / Black',
+        color:
+            'Varsity Red / White / Black',
 
         instock: true,
 
@@ -200,7 +247,8 @@ const SHOE_CATALOG = [
 
         category: 'Sneakers',
 
-        name: "Nike Air Max 95 OG 'Neon' Vintage",
+        name:
+            "Nike Air Max 95 OG 'Neon' Vintage",
 
         price: 11000,
 
@@ -208,7 +256,8 @@ const SHOE_CATALOG = [
 
         sizes: [39, 40, 41, 42, 43, 44],
 
-        color: 'Neon Volt / Grey',
+        color:
+            'Neon Volt / Grey',
 
         instock: true,
 
@@ -224,7 +273,7 @@ const SHOE_CATALOG = [
             'Classic layered suede Air Max silhouette with neon volt highlights and visible air cushioning.',
 
         image:
-            'https://i.imgur.com/YOURIMAGE.png'
+            'https://i.imgur.com/0Z8FQYw.png'
     },
 
     {
@@ -234,7 +283,8 @@ const SHOE_CATALOG = [
 
         category: 'Sneakers',
 
-        name: "Adidas Yeezy Boost 350 V2 'Onyx'",
+        name:
+            "Adidas Yeezy Boost 350 V2 'Onyx'",
 
         price: 12500,
 
@@ -242,7 +292,8 @@ const SHOE_CATALOG = [
 
         sizes: [40, 41, 42, 43, 44, 45],
 
-        color: 'Onyx Black',
+        color:
+            'Onyx Black',
 
         instock: true,
 
@@ -258,7 +309,7 @@ const SHOE_CATALOG = [
             'Primeknit Yeezy silhouette with responsive BOOST cushioning and stealth monochrome styling.',
 
         image:
-            'https://i.imgur.com/YOURIMAGE.png'
+            'https://i.imgur.com/0Z8FQYw.png'
     },
 
     {
@@ -268,7 +319,8 @@ const SHOE_CATALOG = [
 
         category: 'Sneakers',
 
-        name: "New Balance 2002R 'Protection Pack - Rain Cloud'",
+        name:
+            "New Balance 2002R 'Protection Pack - Rain Cloud'",
 
         price: 13000,
 
@@ -276,7 +328,8 @@ const SHOE_CATALOG = [
 
         sizes: [41, 42, 43, 44],
 
-        color: 'Rain Cloud Grey',
+        color:
+            'Rain Cloud Grey',
 
         instock: true,
 
@@ -292,7 +345,7 @@ const SHOE_CATALOG = [
             'Deconstructed premium sneaker featuring rough-cut overlays and ABZORB cushioning.',
 
         image:
-            'https://i.imgur.com/YOURIMAGE.png'
+            'https://i.imgur.com/0Z8FQYw.png'
     },
 
     {
@@ -302,7 +355,8 @@ const SHOE_CATALOG = [
 
         category: 'Sneakers',
 
-        name: "Travis Scott x Air Jordan 1 Low 'Reverse Mocha'",
+        name:
+            "Travis Scott x Air Jordan 1 Low 'Reverse Mocha'",
 
         price: 16500,
 
@@ -310,7 +364,8 @@ const SHOE_CATALOG = [
 
         sizes: [42, 43, 44],
 
-        color: 'Mocha / Sail',
+        color:
+            'Mocha / Sail',
 
         instock: false,
 
@@ -326,7 +381,7 @@ const SHOE_CATALOG = [
             'Highly sought-after Travis Scott collaboration featuring reverse swoosh branding.',
 
         image:
-            'https://i.imgur.com/YOURIMAGE.png'
+            'https://i.imgur.com/0Z8FQYw.png'
     }
 ];
 
@@ -340,7 +395,7 @@ const FAQ_DATA = {
         'Welcome to Cymor Shoe Store — Kenya’s elite sneaker destination.',
 
     authenticity:
-        'All sneakers are quality-verified and shipped securely.',
+        'All sneakers are quality-verified and securely packaged before dispatch.',
 
     delivery:
         'Countrywide delivery available via trusted courier partners.',
@@ -349,7 +404,10 @@ const FAQ_DATA = {
         'We support M-Pesa and Cash on Delivery for selected Nairobi zones.',
 
     support:
-        'Our support team responds daily during business hours.'
+        'Our support team responds daily during business hours.',
+
+    exchange:
+        'Size exchange supported within 48 hours after delivery.'
 };
 
 // ============================================================
@@ -364,7 +422,7 @@ module.exports = {
     // Store
     STORE_INFO,
 
-    // Payment
+    // Payments
     PAYMENT_CONFIG,
 
     // Inventory
