@@ -1,35 +1,41 @@
 {
   "name": "cymor-shoe-store-bot",
-  "version": "2.2.0",
-  "description": "Enterprise-grade WhatsApp Business Automation SaaS powered by CymorTechServices",
+  "version": "3.0.0",
+  "description": "Production-grade WhatsApp Business Automation SaaS powered by CymorTechServices",
   "main": "index.js",
   "private": true,
+
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js",
-    "restart": "npm run start"
+    "start": "pm2-runtime ecosystem.config.js",
+    "dev": "node index.js",
+    "stop": "pm2 stop cymor-whatsapp-bot"
   },
+
   "keywords": [
     "whatsapp-bot",
     "baileys",
-    "whatsapp-business",
-    "ecommerce",
     "automation",
+    "ecommerce",
     "mpesa",
     "kenya",
     "saas",
     "nodejs",
-    "cymor"
+    "cymor",
+    "production"
   ],
+
   "author": "Simion Nashera",
   "license": "MIT",
+
   "engines": {
     "node": "20.x"
   },
+
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.7",
     "dotenv": "^16.4.5",
     "node-cache": "^5.1.2",
-    "pino": "^9.3.2"
+    "pino": "^9.3.2",
+    "pm2": "^5.3.1"
   }
 }
