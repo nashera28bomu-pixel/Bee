@@ -41,11 +41,9 @@ async function startCymorBot() {
             },
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
-            // Optimized browser for pairing stability
             browser: ["Ubuntu", "Chrome", "20.0.0"], 
             markOnlineOnConnect: true,
             syncFullHistory: false,
-            // Increased timeouts for Railway/Mobile stability
             defaultQueryTimeoutMs: 90000,
             connectTimeoutMs: 90000,
             keepAliveIntervalMs: 30000,
@@ -54,7 +52,7 @@ async function startCymorBot() {
 
         // 4. CONNECTION EVENTS
         sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
+            const { connection, lastDisconnect } = update;
 
             if (connection === 'open') {
                 console.log('\n========================================');
@@ -75,7 +73,6 @@ async function startCymorBot() {
                 pairingCodeRequested = true;
                 const formattedNumber = phoneNumber.replace(/\D/g, '');
 
-                // Delay pairing request slightly to ensure socket is ready
                 setTimeout(async () => {
                     try {
                         console.log(`🔄 Requesting Pairing Code for: +${formattedNumber}`);
@@ -115,10 +112,17 @@ async function startCymorBot() {
         sock.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 const msg = chatUpdate.messages?.[0];
-                if (!msg || !msg.message || msg.key.fromMe) return;
+                if (!msg || !msg.message) return;
+
+                // Log the incoming message to Railway Terminal for debugging
+                console.log(`📩 New message from ${msg.key.remoteJid}: ${JSON.stringify(msg.message)}`);
+
+                // Ignore status broadcasts
                 if (msg.key.remoteJid === 'status@broadcast') return;
 
+                // Process the message (even if fromMe is true)
                 await handleIncomingMessage(sock, msg);
+
             } catch (error) {
                 console.error('❌ Message Error:', error.message);
             }
