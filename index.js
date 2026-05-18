@@ -18,7 +18,7 @@ const { handleIncomingMessage } = require('./botLogic');
 const { BOT_NAME } = require('./config');
 
 // ======================================================
-// CYMOR ENGINE CONFIG
+// CONFIG
 // ======================================================
 
 const PORT = process.env.PORT || 8080;
@@ -27,103 +27,48 @@ const AUTH_FOLDER = '/app/auth_info';
 const logger = pino({ level: 'silent' });
 const msgRetryCounterCache = new NodeCache();
 
-// ======================================================
-// GLOBAL SOCKET LOCK (CRITICAL FIX)
-// ======================================================
-
-let GLOBAL_SOCKET = null;
+let sock = null;
 let reconnecting = false;
-let heartbeatInterval = null;
-let aliveInterval = null;
 
 // ======================================================
-// ENSURE AUTH FOLDER
+// KEEP ALIVE SERVER
+// ======================================================
+
+http.createServer((req, res) => {
+    res.writeHead(200);
+    res.end(`${BOT_NAME} alive`);
+}).listen(PORT);
+
+// ======================================================
+// AUTH FOLDER SAFE
 // ======================================================
 
 if (!fs.existsSync(AUTH_FOLDER)) {
     fs.mkdirSync(AUTH_FOLDER, { recursive: true });
-
-    console.log('\n========================================');
-    console.log('📁 AUTH FOLDER READY');
-    console.log(`📂 ${AUTH_FOLDER}`);
-    console.log('========================================\n');
 }
 
 // ======================================================
-// HEALTH SERVER (REQUIRED FOR RAILWAY)
+// GLOBAL CRASH PROTECTION
 // ======================================================
 
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end(`${BOT_NAME} Engine Running`);
+process.on('uncaughtException', (err) => {
+    console.log('❌ CRASH (uncaught):', err);
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-
-    console.log('\n========================================');
-    console.log(`🚀 CYMOR ENGINE STARTED`);
-    console.log(`🌐 PORT: ${PORT}`);
-    console.log(`📂 AUTH: ${AUTH_FOLDER}`);
-    console.log('========================================\n');
-
-    startHeartbeat();
-    startAliveLoop();
-    startCymorBot();
+process.on('unhandledRejection', (err) => {
+    console.log('❌ CRASH (promise):', err);
 });
 
 // ======================================================
-// HEARTBEAT (LOGGING ONLY)
+// BOT ENGINE
 // ======================================================
 
-function startHeartbeat() {
+async function startBot() {
 
-    if (heartbeatInterval) clearInterval(heartbeatInterval);
-
-    heartbeatInterval = setInterval(() => {
-
-        const mem = process.memoryUsage();
-
-        console.log(
-            `💓 HEARTBEAT | RAM: ${Math.round(mem.heapUsed / 1024 / 1024)}MB`
-        );
-
-    }, 30000);
-}
-
-// ======================================================
-// CRITICAL ALIVE LOOP (PREVENTS CONTAINER SLEEP)
-// ======================================================
-
-function startAliveLoop() {
-
-    if (aliveInterval) clearInterval(aliveInterval);
-
-    aliveInterval = setInterval(() => {
-
-        // KEEP EVENT LOOP ACTIVE
-        if (GLOBAL_SOCKET?.ws?.readyState === 1) {
-            try {
-                GLOBAL_SOCKET.sendPresenceUpdate('available');
-            } catch {}
-        }
-
-    }, 25000);
-}
-
-// ======================================================
-// MAIN BOT ENGINE
-// ======================================================
-
-async function startCymorBot() {
+    if (reconnecting) return;
+    reconnecting = true;
 
     try {
-
-        if (reconnecting) return;
-        reconnecting = true;
-
-        console.log('\n========================================');
-        console.log(`🚀 STARTING ${BOT_NAME}`);
-        console.log('========================================\n');
 
         const { state, saveCreds } =
             await useMultiFileAuthState(AUTH_FOLDER);
@@ -131,28 +76,16 @@ async function startCymorBot() {
         const { version } =
             await fetchLatestBaileysVersion();
 
-        console.log(`📦 BAILEYS: ${version.join('.')}`);
-
-        // ======================================================
-        // CREATE SOCKET (LOCKED GLOBAL)
-        // ======================================================
-
-        GLOBAL_SOCKET = makeWASocket({
+        sock = makeWASocket({
 
             version,
-
             logger,
-
             printQRInTerminal: false,
-
             browser: Browsers.ubuntu('Chrome'),
 
             auth: {
                 creds: state.creds,
-                keys: makeCacheableSignalKeyStore(
-                    state.keys,
-                    logger
-                )
+                keys: makeCacheableSignalKeyStore(state.keys, logger)
             },
 
             markOnlineOnConnect: true,
@@ -161,78 +94,55 @@ async function startCymorBot() {
             msgRetryCounterCache
         });
 
-        const sock = GLOBAL_SOCKET;
+        // ==================================================
+        // CONNECTION HANDLER (SAFE)
+        // ==================================================
 
-        // ======================================================
-        // CONNECTION EVENTS
-        // ======================================================
+        sock.ev.on('connection.update', (u) => {
 
-        sock.ev.on('connection.update', (update) => {
-
-            const { connection, lastDisconnect } = update;
-
-            if (connection === 'connecting') {
-                console.log('🔄 CONNECTING...');
-            }
+            const { connection, lastDisconnect } = u;
 
             if (connection === 'open') {
-
                 reconnecting = false;
-
-                console.log('\n========================================');
-                console.log(`✅ ${BOT_NAME} CONNECTED`);
-                console.log('🟢 ACTIVE');
-                console.log('========================================\n');
+                console.log('🟢 CONNECTED');
             }
 
             if (connection === 'close') {
 
                 reconnecting = false;
 
-                const statusCode =
+                const code =
                     lastDisconnect?.error?.output?.statusCode;
 
-                const shouldReconnect =
-                    statusCode !== DisconnectReason.loggedOut;
+                const restart =
+                    code !== DisconnectReason.loggedOut;
 
-                console.log('\n========================================');
-                console.log('❌ CONNECTION CLOSED');
-                console.log(`📡 CODE: ${statusCode}`);
-                console.log(`🔁 RECONNECT: ${shouldReconnect}`);
-                console.log('========================================\n');
+                console.log('❌ DISCONNECTED:', code);
 
-                try {
-                    GLOBAL_SOCKET?.ws?.close();
-                } catch {}
+                if (sock?.ws) sock.ws.close();
 
-                if (shouldReconnect) {
-
-                    setTimeout(() => {
-                        startCymorBot();
-                    }, 4000);
-
-                } else {
-                    console.log('❌ LOGGED OUT - REPAIR REQUIRED');
+                if (restart) {
+                    setTimeout(startBot, 4000);
                 }
             }
         });
 
-        // ======================================================
-        // SAVE CREDS
-        // ======================================================
-
         sock.ev.on('creds.update', saveCreds);
 
-        // ======================================================
-        // MESSAGE HANDLER
-        // ======================================================
+        // ==================================================
+        // MESSAGE HANDLER (FULL PROTECTION)
+        // ==================================================
 
-        sock.ev.on('messages.upsert', async (chatUpdate) => {
+        sock.ev.on('messages.upsert', async (m) => {
 
             try {
-                await handleIncomingMessage(sock, chatUpdate);
+
+                if (!m?.messages?.[0]) return;
+
+                await handleIncomingMessage(sock, m);
+
             } catch (err) {
-                console.error('❌ MESSAGE ERROR:', err);
+                console.log('🔥 MESSAGE CRASH CAUGHT:', err);
             }
         });
 
@@ -240,31 +150,14 @@ async function startCymorBot() {
 
         reconnecting = false;
 
-        console.error('\n========================================');
-        console.error('❌ ENGINE CRASH');
-        console.error(err);
-        console.error('========================================\n');
+        console.log('❌ ENGINE CRASH:', err);
 
-        setTimeout(() => startCymorBot(), 8000);
+        setTimeout(startBot, 5000);
     }
 }
 
 // ======================================================
-// GLOBAL SAFETY NETS
+// START WITH PM2 SAFETY
 // ======================================================
 
-process.on('uncaughtException', (err) => {
-    console.error('❌ UNCAUGHT:', err);
-});
-
-process.on('unhandledRejection', (err) => {
-    console.error('❌ REJECTION:', err);
-});
-
-// ======================================================
-// HARD PROCESS LOCK (CRITICAL FOR RAILWAY)
-// ======================================================
-
-process.stdin.resume();
-
-setInterval(() => {}, 1000 * 60 * 60);
+startBot();
