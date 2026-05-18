@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -13,40 +15,52 @@ const { BOT_NAME } = require('./config');
 
 // ======================================================
 // CYMOR WHATSAPP ENGINE
-// Stable Railway Production Version
+// Railway Production Build
 // ======================================================
 
 // Message retry cache
 const msgRetryCounterCache = new NodeCache();
 
-// Prevent duplicate pairing requests
+// Pairing lock
 let pairingCodeRequested = false;
 
-// Prevent reconnect spam
+// Reconnect protection
 let reconnecting = false;
 
 // ======================================================
-// MAIN BOT STARTER
+// START BOT
 // ======================================================
 
 async function startCymorBot() {
+
     try {
 
         console.log('\n========================================');
-        console.log(`🚀 Starting ${BOT_NAME} Engine...`);
+        console.log(`🚀 Starting ${BOT_NAME} Engine`);
         console.log('========================================\n');
 
-        // Railway persistent auth folder
-        const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
+        // ======================================================
+        // AUTH SESSION
+        // ======================================================
 
-        // Latest Baileys version
-        const { version } = await fetchLatestBaileysVersion();
+        const {
+            state,
+            saveCreds
+        } = await useMultiFileAuthState('./auth_info');
+
+        // ======================================================
+        // BAILEYS VERSION
+        // ======================================================
+
+        const { version } =
+            await fetchLatestBaileysVersion();
 
         // ======================================================
         // SOCKET CONFIG
         // ======================================================
 
         const sock = makeWASocket({
+
             version,
 
             auth: state,
@@ -57,7 +71,7 @@ async function startCymorBot() {
 
             printQRInTerminal: false,
 
-            browser: ['CymorBot', 'Chrome', '1.0.0'],
+            browser: ['CymorBot', 'Chrome', '2.0.0'],
 
             markOnlineOnConnect: true,
 
@@ -72,6 +86,10 @@ async function startCymorBot() {
             generateHighQualityLinkPreview: true,
 
             emitOwnEvents: false,
+
+            fireInitQueries: true,
+
+            retryRequestDelayMs: 250,
 
             msgRetryCounterCache
         });
@@ -88,7 +106,7 @@ async function startCymorBot() {
             } = update;
 
             // ======================================================
-            // CONNECTION OPENED
+            // OPEN
             // ======================================================
 
             if (connection === 'open') {
@@ -96,56 +114,71 @@ async function startCymorBot() {
                 reconnecting = false;
 
                 console.log('\n========================================');
-                console.log(`✅ ${BOT_NAME} is ONLINE`);
+                console.log(`✅ ${BOT_NAME} Connected Successfully`);
                 console.log('========================================\n');
 
-                // ======================================================
-                // REQUEST PAIRING CODE
-                // ======================================================
+                return;
+            }
 
-                if (
-                    !sock.authState.creds.registered &&
-                    !pairingCodeRequested
-                ) {
-                    try {
+            // ======================================================
+            // REQUEST PAIRING
+            // ======================================================
 
-                        pairingCodeRequested = true;
+            if (
+                connection === 'connecting' &&
+                !sock.authState.creds.registered &&
+                !pairingCodeRequested
+            ) {
 
-                        // Your WhatsApp number
-                        const phoneNumber = '254784074568';
+                try {
 
-                        const formattedNumber = phoneNumber.replace(/\D/g, '');
+                    pairingCodeRequested = true;
 
-                        console.log('🔄 Requesting Pairing Code...');
-                        console.log(`📱 Number: +${formattedNumber}\n`);
+                    const phoneNumber =
+                        process.env.PAIRING_NUMBER;
 
-                        const code = await sock.requestPairingCode(
+                    if (!phoneNumber) {
+
+                        console.log(
+                            '❌ PAIRING_NUMBER missing in .env'
+                        );
+
+                        return;
+                    }
+
+                    const formattedNumber =
+                        phoneNumber.replace(/\D/g, '');
+
+                    console.log('🔄 Requesting Pairing Code...');
+                    console.log(`📱 Number: +${formattedNumber}\n`);
+
+                    const code =
+                        await sock.requestPairingCode(
                             formattedNumber
                         );
 
-                        console.log('========================================');
-                        console.log(`✅ PAIRING CODE: ${code}`);
-                        console.log('========================================\n');
+                    console.log('\n========================================');
+                    console.log(`✅ YOUR PAIRING CODE: ${code}`);
+                    console.log('========================================\n');
 
-                        console.log('📌 HOW TO LINK');
-                        console.log('1. Open WhatsApp');
-                        console.log('2. Go to Linked Devices');
-                        console.log('3. Tap "Link with phone number instead"');
-                        console.log(`4. Enter code: ${code}\n`);
+                    console.log('📌 HOW TO LINK');
+                    console.log('1. Open WhatsApp');
+                    console.log('2. Go to Linked Devices');
+                    console.log('3. Tap "Link with phone number instead"');
+                    console.log(`4. Enter code: ${code}\n`);
 
-                    } catch (error) {
+                } catch (error) {
 
-                        pairingCodeRequested = false;
+                    pairingCodeRequested = false;
 
-                        console.error('\n❌ PAIRING FAILED');
-                        console.error(error?.message || error);
+                    console.error('\n❌ PAIRING ERROR');
+                    console.error(error?.message || error);
 
-                    }
                 }
             }
 
             // ======================================================
-            // CONNECTION CLOSED
+            // CLOSE
             // ======================================================
 
             if (connection === 'close') {
@@ -157,7 +190,7 @@ async function startCymorBot() {
                     statusCode !== DisconnectReason.loggedOut;
 
                 console.log('\n⚠️ Connection Closed');
-                console.log(`📡 Status Code: ${statusCode}\n`);
+                console.log(`📡 Status Code: ${statusCode}`);
 
                 // ======================================================
                 // LOGGED OUT
@@ -165,7 +198,7 @@ async function startCymorBot() {
 
                 if (!shouldReconnect) {
 
-                    console.log('❌ Device Logged Out');
+                    console.log('\n❌ Session Logged Out');
                     console.log(
                         '🗑️ Delete auth_info folder and reconnect.\n'
                     );
@@ -174,7 +207,7 @@ async function startCymorBot() {
                 }
 
                 // ======================================================
-                // RECONNECT SAFETY
+                // PREVENT RECONNECT SPAM
                 // ======================================================
 
                 if (reconnecting) {
@@ -185,7 +218,7 @@ async function startCymorBot() {
 
                 pairingCodeRequested = false;
 
-                console.log('🔄 Reconnecting in 5 seconds...\n');
+                console.log('\n🔄 Reconnecting in 5 seconds...\n');
 
                 setTimeout(() => {
                     startCymorBot();
@@ -194,20 +227,21 @@ async function startCymorBot() {
         });
 
         // ======================================================
-        // SAVE SESSION
+        // SAVE CREDS
         // ======================================================
 
         sock.ev.on('creds.update', saveCreds);
 
         // ======================================================
-        // INCOMING MESSAGES
+        // MESSAGE EVENTS
         // ======================================================
 
         sock.ev.on('messages.upsert', async (chatUpdate) => {
 
             try {
 
-                const msg = chatUpdate.messages[0];
+                const msg =
+                    chatUpdate.messages?.[0];
 
                 if (!msg) return;
 
@@ -216,6 +250,11 @@ async function startCymorBot() {
 
                 // Ignore bot's own messages
                 if (msg.key.fromMe) return;
+
+                // Ignore status broadcasts
+                if (msg.key.remoteJid === 'status@broadcast') {
+                    return;
+                }
 
                 await handleIncomingMessage(sock, msg);
 
