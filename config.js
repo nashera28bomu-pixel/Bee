@@ -38,7 +38,7 @@ const SYSTEM_CONFIG = {
     CURRENCY: 'KSh',
 
     // Business owner routing number
-    OWNER_NUMBER: '254712345678'
+    OWNER_NUMBER: '254113821327'
 };
 
 // ============================================================
@@ -59,7 +59,7 @@ const STORE_INFO = {
         sunday: '11:00 AM - 4:00 PM'
     },
 
-    supportContact: '+254712345678',
+    supportContact: '+254113821327',
 
     instagram: '@cymorshoes',
 
