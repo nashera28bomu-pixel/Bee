@@ -22,82 +22,92 @@ const { BOT_NAME } = require('./config');
 // ======================================================
 
 const PORT = process.env.PORT || 8080;
-
-// IMPORTANT:
-// This MUST match your mounted persistent disk path
 const AUTH_FOLDER = '/app/auth_info';
 
-const logger = pino({
-    level: 'silent'
-});
-
+const logger = pino({ level: 'silent' });
 const msgRetryCounterCache = new NodeCache();
 
-let sock = null;
+// ======================================================
+// GLOBAL SOCKET LOCK (CRITICAL FIX)
+// ======================================================
+
+let GLOBAL_SOCKET = null;
 let reconnecting = false;
 let heartbeatInterval = null;
+let aliveInterval = null;
 
 // ======================================================
-// CREATE AUTH FOLDER
+// ENSURE AUTH FOLDER
 // ======================================================
 
 if (!fs.existsSync(AUTH_FOLDER)) {
     fs.mkdirSync(AUTH_FOLDER, { recursive: true });
 
     console.log('\n========================================');
-    console.log('📁 AUTH FOLDER CREATED');
-    console.log(`📂 PATH: ${AUTH_FOLDER}`);
+    console.log('📁 AUTH FOLDER READY');
+    console.log(`📂 ${AUTH_FOLDER}`);
     console.log('========================================\n');
 }
 
 // ======================================================
-// HEALTH CHECK SERVER
+// HEALTH SERVER (REQUIRED FOR RAILWAY)
 // ======================================================
 
 const server = http.createServer((req, res) => {
-
-    res.writeHead(200, {
-        'Content-Type': 'text/plain'
-    });
-
-    res.end(`${BOT_NAME} Engine Online`);
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end(`${BOT_NAME} Engine Running`);
 });
 
 server.listen(PORT, '0.0.0.0', () => {
 
     console.log('\n========================================');
-    console.log(`🚀 CYMOR ENGINE ONLINE`);
+    console.log(`🚀 CYMOR ENGINE STARTED`);
     console.log(`🌐 PORT: ${PORT}`);
-    console.log(`📂 AUTH PATH: ${AUTH_FOLDER}`);
+    console.log(`📂 AUTH: ${AUTH_FOLDER}`);
     console.log('========================================\n');
 
-    // Start heartbeat
     startHeartbeat();
-
-    // Start WhatsApp Engine
+    startAliveLoop();
     startCymorBot();
 });
 
 // ======================================================
-// HEARTBEAT SYSTEM
-// Prevents Railway/Render sleeping
+// HEARTBEAT (LOGGING ONLY)
 // ======================================================
 
 function startHeartbeat() {
 
-    if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-    }
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
 
     heartbeatInterval = setInterval(() => {
 
-        const memory = process.memoryUsage();
+        const mem = process.memoryUsage();
 
         console.log(
-            `💓 HEARTBEAT | RAM: ${Math.round(memory.heapUsed / 1024 / 1024)}MB`
+            `💓 HEARTBEAT | RAM: ${Math.round(mem.heapUsed / 1024 / 1024)}MB`
         );
 
     }, 30000);
+}
+
+// ======================================================
+// CRITICAL ALIVE LOOP (PREVENTS CONTAINER SLEEP)
+// ======================================================
+
+function startAliveLoop() {
+
+    if (aliveInterval) clearInterval(aliveInterval);
+
+    aliveInterval = setInterval(() => {
+
+        // KEEP EVENT LOOP ACTIVE
+        if (GLOBAL_SOCKET?.ws?.readyState === 1) {
+            try {
+                GLOBAL_SOCKET.sendPresenceUpdate('available');
+            } catch {}
+        }
+
+    }, 25000);
 }
 
 // ======================================================
@@ -108,36 +118,26 @@ async function startCymorBot() {
 
     try {
 
-        // Prevent multiple reconnect loops
         if (reconnecting) return;
-
         reconnecting = true;
 
         console.log('\n========================================');
         console.log(`🚀 STARTING ${BOT_NAME}`);
         console.log('========================================\n');
 
-        // ======================================================
-        // AUTH STATE
-        // ======================================================
-
         const { state, saveCreds } =
             await useMultiFileAuthState(AUTH_FOLDER);
-
-        // ======================================================
-        // BAILEYS VERSION
-        // ======================================================
 
         const { version } =
             await fetchLatestBaileysVersion();
 
-        console.log(`📦 BAILEYS VERSION: ${version.join('.')}`);
+        console.log(`📦 BAILEYS: ${version.join('.')}`);
 
         // ======================================================
-        // CREATE SOCKET
+        // CREATE SOCKET (LOCKED GLOBAL)
         // ======================================================
 
-        sock = makeWASocket({
+        GLOBAL_SOCKET = makeWASocket({
 
             version,
 
@@ -156,112 +156,64 @@ async function startCymorBot() {
             },
 
             markOnlineOnConnect: true,
-
             syncFullHistory: false,
-
-            defaultQueryTimeoutMs: 60000,
-
-            connectTimeoutMs: 60000,
-
             keepAliveIntervalMs: 15000,
-
-            emitOwnEvents: false,
-
-            fireInitQueries: true,
-
-            generateHighQualityLinkPreview: false,
-
             msgRetryCounterCache
         });
+
+        const sock = GLOBAL_SOCKET;
 
         // ======================================================
         // CONNECTION EVENTS
         // ======================================================
 
-        sock.ev.on('connection.update', async (update) => {
+        sock.ev.on('connection.update', (update) => {
 
-            try {
+            const { connection, lastDisconnect } = update;
 
-                const {
-                    connection,
-                    lastDisconnect
-                } = update;
+            if (connection === 'connecting') {
+                console.log('🔄 CONNECTING...');
+            }
 
-                // ==================================================
-                // CONNECTING
-                // ==================================================
+            if (connection === 'open') {
 
-                if (connection === 'connecting') {
+                reconnecting = false;
 
-                    console.log('🔄 CONNECTING TO WHATSAPP...');
+                console.log('\n========================================');
+                console.log(`✅ ${BOT_NAME} CONNECTED`);
+                console.log('🟢 ACTIVE');
+                console.log('========================================\n');
+            }
+
+            if (connection === 'close') {
+
+                reconnecting = false;
+
+                const statusCode =
+                    lastDisconnect?.error?.output?.statusCode;
+
+                const shouldReconnect =
+                    statusCode !== DisconnectReason.loggedOut;
+
+                console.log('\n========================================');
+                console.log('❌ CONNECTION CLOSED');
+                console.log(`📡 CODE: ${statusCode}`);
+                console.log(`🔁 RECONNECT: ${shouldReconnect}`);
+                console.log('========================================\n');
+
+                try {
+                    GLOBAL_SOCKET?.ws?.close();
+                } catch {}
+
+                if (shouldReconnect) {
+
+                    setTimeout(() => {
+                        startCymorBot();
+                    }, 4000);
+
+                } else {
+                    console.log('❌ LOGGED OUT - REPAIR REQUIRED');
                 }
-
-                // ==================================================
-                // CONNECTED
-                // ==================================================
-
-                if (connection === 'open') {
-
-                    reconnecting = false;
-
-                    console.log('\n========================================');
-                    console.log(`✅ ${BOT_NAME} CONNECTED`);
-                    console.log('🟢 WHATSAPP SESSION ACTIVE');
-                    console.log('========================================\n');
-                }
-
-                // ==================================================
-                // DISCONNECTED
-                // ==================================================
-
-                if (connection === 'close') {
-
-                    reconnecting = false;
-
-                    const statusCode =
-                        lastDisconnect?.error?.output?.statusCode;
-
-                    const shouldReconnect =
-                        statusCode !== DisconnectReason.loggedOut;
-
-                    console.log('\n========================================');
-                    console.log('❌ CONNECTION CLOSED');
-                    console.log(`📡 STATUS CODE: ${statusCode}`);
-                    console.log(`🔁 RECONNECT: ${shouldReconnect}`);
-                    console.log('========================================\n');
-
-                    // Cleanup old socket
-                    if (sock?.ws) {
-
-                        try {
-                            sock.ws.close();
-                        } catch (e) {}
-                    }
-
-                    // Reconnect if not logged out
-                    if (shouldReconnect) {
-
-                        console.log('🔄 RESTARTING ENGINE IN 5 SECONDS...\n');
-
-                        setTimeout(() => {
-                            startCymorBot();
-                        }, 5000);
-
-                    } else {
-
-                        console.log('\n========================================');
-                        console.log('❌ DEVICE LOGGED OUT');
-                        console.log('📱 RE-LINK YOUR WHATSAPP');
-                        console.log('========================================\n');
-                    }
-                }
-
-            } catch (err) {
-
-                console.error(
-                    '❌ CONNECTION EVENT ERROR:',
-                    err
-                );
             }
         });
 
@@ -269,42 +221,18 @@ async function startCymorBot() {
         // SAVE CREDS
         // ======================================================
 
-        sock.ev.on('creds.update', async () => {
-
-            try {
-
-                await saveCreds();
-
-                console.log('💾 SESSION SAVED');
-
-            } catch (err) {
-
-                console.error(
-                    '❌ FAILED TO SAVE CREDS:',
-                    err
-                );
-            }
-        });
+        sock.ev.on('creds.update', saveCreds);
 
         // ======================================================
-        // MESSAGE EVENTS
+        // MESSAGE HANDLER
         // ======================================================
 
         sock.ev.on('messages.upsert', async (chatUpdate) => {
 
             try {
-
-                await handleIncomingMessage(
-                    sock,
-                    chatUpdate
-                );
-
+                await handleIncomingMessage(sock, chatUpdate);
             } catch (err) {
-
-                console.error(
-                    '❌ MESSAGE HANDLER ERROR:',
-                    err
-                );
+                console.error('❌ MESSAGE ERROR:', err);
             }
         });
 
@@ -313,70 +241,30 @@ async function startCymorBot() {
         reconnecting = false;
 
         console.error('\n========================================');
-        console.error('❌ CRITICAL ENGINE FAILURE');
+        console.error('❌ ENGINE CRASH');
         console.error(err);
         console.error('========================================\n');
 
-        setTimeout(() => {
-
-            console.log('🔄 RETRYING BOT START...\n');
-
-            startCymorBot();
-
-        }, 10000);
+        setTimeout(() => startCymorBot(), 8000);
     }
 }
 
 // ======================================================
-// GLOBAL ERROR HANDLING
+// GLOBAL SAFETY NETS
 // ======================================================
 
 process.on('uncaughtException', (err) => {
-
-    console.error('\n========================================');
-    console.error('❌ UNCAUGHT EXCEPTION');
-    console.error(err);
-    console.error('========================================\n');
+    console.error('❌ UNCAUGHT:', err);
 });
 
-process.on('unhandledRejection', (reason) => {
-
-    console.error('\n========================================');
-    console.error('❌ UNHANDLED REJECTION');
-    console.error(reason);
-    console.error('========================================\n');
+process.on('unhandledRejection', (err) => {
+    console.error('❌ REJECTION:', err);
 });
 
 // ======================================================
-// KEEP NODE PROCESS ALIVE
+// HARD PROCESS LOCK (CRITICAL FOR RAILWAY)
 // ======================================================
 
 process.stdin.resume();
 
-// ======================================================
-// GRACEFUL SHUTDOWN
-// ======================================================
-
-process.on('SIGINT', async () => {
-
-    console.log('\n🛑 SHUTTING DOWN ENGINE...\n');
-
-    try {
-
-        if (heartbeatInterval) {
-            clearInterval(heartbeatInterval);
-        }
-
-        if (sock?.ws) {
-            sock.ws.close();
-        }
-
-        process.exit(0);
-
-    } catch (err) {
-
-        console.error(err);
-
-        process.exit(1);
-    }
-});
+setInterval(() => {}, 1000 * 60 * 60);
