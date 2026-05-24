@@ -1,0 +1,24 @@
+.form-strip {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.form-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.size-sm .form-dot { width: 18px; height: 18px; font-size: 10px; }
+.size-md .form-dot { width: 24px; height: 24px; font-size: 11px; }
+.size-lg .form-dot { width: 30px; height: 30px; font-size: 13px; }
+
+.result-w { background: rgba(0, 255, 135, 0.15); color: var(--accent-green); }
+.result-d { background: rgba(61, 142, 248, 0.15); color: var(--accent-blue); }
+.result-l { background: rgba(255, 61, 61, 0.15); color: var(--accent-red); }
+.result-n { background: var(--bg-secondary); color: var(--text-muted); }
