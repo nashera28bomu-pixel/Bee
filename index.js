@@ -3,7 +3,8 @@ const {
     default: makeWASocket, 
     useMultiFileAuthState, 
     DisconnectReason, 
-    fetchLatestBaileysVersion 
+    fetchLatestBaileysVersion,
+    Browsers // Added to ensure standard browser strings
 } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
@@ -11,6 +12,7 @@ const axios = require('axios');
 const http = require('http');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const config = require('./config');
+const fs = require('fs');
 
 // ─── 🌐 RENDER PORT BINDING ───
 const port = process.env.PORT || 3000;
@@ -31,6 +33,11 @@ const clientStates = {};
 const pendingNotifications = new Set();
 
 async function launchCymorCore() {
+    // 🛡️ SESSION CLEANER: Removes incomplete creds if pairing failed previously
+    if (!fs.existsSync('./cymor_auth_session/creds.json')) {
+        console.log("🧹 Initializing clean session...");
+    }
+
     const { state, saveCreds } = await useMultiFileAuthState('cymor_auth_session');
     const { version } = await fetchLatestBaileysVersion();
 
@@ -39,12 +46,13 @@ async function launchCymorCore() {
         auth: state,
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: ["Ubuntu", "Chrome", "20.0.04"]
+        // 🔄 FIXED BROWSER STRING: Essential for "Real" pairing codes
+        browser: Browsers.ubuntu('Chrome') 
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    // ─── 🔑 SMART PAIRING ENGINE (WITH AUTO-RETRY) ───
+    // ─── 🔑 RE-OPTIMIZED PAIRING ENGINE ───
     let pairingTimeout;
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
@@ -55,20 +63,24 @@ async function launchCymorCore() {
             const requestNewCode = async () => {
                 if (sock.authState.creds.registered) return;
                 try {
-                    console.log(`📡 Generating fresh pairing code for ${botPhoneNumber}...`);
+                    // Give the socket a moment to stabilize
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    
+                    console.log(`📡 Requesting Official Pairing Code for ${botPhoneNumber}...`);
                     let code = await sock.requestPairingCode(botPhoneNumber);
                     code = code?.match(/.{1,4}/g)?.join("-") || code;
+                    
                     console.log(`\n╔══════════════════════════════════════════╗`);
                     console.log(`║   💎 CYMOR BOT PAIRING CODE GENERATED    ║`);
                     console.log(`╠══════════════════════════════════════════╣`);
                     console.log(`║          👉  ${code}  👈          ║`);
                     console.log(`╚══════════════════════════════════════════╝\n`);
                     
-                    // If not paired in 110 seconds, trigger another code request
+                    // Refresh code every 2 minutes if not paired
                     clearTimeout(pairingTimeout);
-                    pairingTimeout = setTimeout(requestNewCode, 110000); 
+                    pairingTimeout = setTimeout(requestNewCode, 120000); 
                 } catch (err) {
-                    console.error("❌ Pairing Code Request Failed, retrying in 10s...");
+                    console.error("❌ Pairing Request Fault. Retrying...");
                     setTimeout(requestNewCode, 10000);
                 }
             };
@@ -77,7 +89,7 @@ async function launchCymorCore() {
         }
 
         if (connection === 'open') {
-            console.log('🚀 Cymor Assistant: Online and Connected!');
+            console.log('🚀 Cymor Assistant: Online and Fully Linked!');
             clearTimeout(pairingTimeout);
         }
 
@@ -88,7 +100,7 @@ async function launchCymorCore() {
         }
     });
 
-    // ─── 💬 MESSAGE PIPELINE ───
+    // ─── 💬 MESSAGE HANDLING ───
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
@@ -105,7 +117,7 @@ async function launchCymorCore() {
 
         if (!isBotActive) return;
 
-        // 🎵 Jukebox
+        // !play command
         if (lowerBody.startsWith('!play ')) {
             const query = body.substring(6).trim();
             await sock.sendMessage(from, { text: `⚡ _Fetching: "${query}"..._` }, { quoted: msg });
@@ -122,33 +134,27 @@ async function launchCymorCore() {
             } catch (e) { return await sock.sendMessage(from, { text: "❌ Jukebox Error." }); }
         }
 
-        // 🤖 AI Chat State
+        // Gemini AI Chat
         if (clientStates[from] === 'IN_GEMINI_CHAT') {
-            if (lowerBody === 'exit') { 
-                clientStates[from] = null; 
-                return await sock.sendMessage(from, { text: "🤖 AI Session Ended. Have a lovely day!" }); 
-            }
+            if (lowerBody === 'exit') { clientStates[from] = null; return await sock.sendMessage(from, { text: "🤖 AI Session Ended. Have a lovely day!" }); }
             const res = await aiModel.generateContent(body);
-            const aiReply = res.response.text();
-            return await sock.sendMessage(from, { 
-                text: `${aiReply}\n\n_I will ensure Cymor sees your message once he is back._\n\n*Type exit to return to Menu.*` 
-            }, { quoted: msg });
+            return await sock.sendMessage(from, { text: `${res.response.text()}\n\n_I will ensure Cymor sees your message._\n\n*Type exit to return to Menu.*` }, { quoted: msg });
         }
 
-        // 🎛️ Menu Logic Options
-        if (body === '1') { clientStates[from] = 'IN_GEMINI_CHAT'; return await sock.sendMessage(from, { text: "🤖 *CymorAI Activated.*\nHow can I help you today? I'll make sure Simion sees this later." }); }
-        if (body === '2') return await sock.sendMessage(from, { text: "💼 *Business Portal*\nPlease describe your project needs in detail. Simion will see this and get back to you. Have a lovely day!" });
-        if (body === '3') return await sock.sendMessage(from, { text: "🎵 *Music Jukebox*\nSend `!play [Song Name]` to enjoy some music while you wait for Cymor!" });
-        if (body === '4') return await sock.sendMessage(from, { text: "✨ *Brand Portfolio*\nBrowse our services: Site Dev, Bot creation, and Premium Edits. Have a lovely day!" });
-        if (body === '5') return await sock.sendMessage(from, { text: "🎮 *eFootball Challenge*\nDrop your squad name! Cymor (3137 strength) will check this soon. Have a lovely day!" });
+        // Menu Selections
+        if (body === '1') { clientStates[from] = 'IN_GEMINI_CHAT'; return await sock.sendMessage(from, { text: "🤖 *CymorAI Activated.*\nHow can I help you today?" }); }
+        if (body === '2') return await sock.sendMessage(from, { text: "💼 *Business Portal*\nDescribe your project. Have a lovely day!" });
+        if (body === '3') return await sock.sendMessage(from, { text: "🎵 *Music Jukebox*\nSend `!play [Song Name]` to enjoy some music!" });
+        if (body === '4') return await sock.sendMessage(from, { text: "✨ *Brand Portfolio*\nSite Dev | Bots | Premium Edits. Have a lovely day!" });
+        if (body === '5') return await sock.sendMessage(from, { text: "🎮 *eFootball Challenge*\nDrop your squad name. Cymor will check this soon!" });
         if (body === '6') { 
             pendingNotifications.add(from);
-            await sock.sendMessage(config.ownerNumber, { text: `🚨 Contact request from ${pushName} (${from})` });
-            return await sock.sendMessage(from, { text: "✨ *Notification Sent!*\nCymor has been alerted. He will contact you soon. Have a lovely day!" });
+            await sock.sendMessage(config.ownerNumber, { text: `🚨 Lead: ${pushName} (${from})` });
+            return await sock.sendMessage(from, { text: "✨ Notification Sent! Have a lovely day!" });
         }
 
-        // 🌟 Welcome Menu
-        const greets = ["hi", "hello", "sasa", "niaje", "mambo", "hey"];
+        // Greeting & Menu
+        const greets = ["hi", "hello", "sasa", "niaje", "hey"];
         if (greets.some(g => lowerBody.includes(g))) {
             const currentActivity = config.activities[Math.floor(Math.random() * config.activities.length)];
             const menu = `
@@ -160,8 +166,6 @@ Hi *${pushName}*! 👋
 
 Thanks for contacting Cymor! He is currently *offline* ${currentActivity}.
 
-I am his digital assistant. You can browse the options below, play some MP3 music using *!play*, or simply come back later!
-
 ✨ ══════════════════════════ ✨
    *💬 [1]* Chat with CymorAI
    *💼 [2]* Business Request
@@ -171,10 +175,8 @@ I am his digital assistant. You can browse the options below, play some MP3 musi
    *🤖 [6]* Request a Bot Like Me
 ✨ ══════════════════════════ ✨
 
-*Select an option (1-6) to start.*
-_Created by Legendary Smiley Cymor_
-_Have a lovely day!_
-`;
+_Select an option (1-6) or use !play to start._
+_Have a lovely day!_`;
             return await sock.sendMessage(from, { text: menu.trim() }, { quoted: msg });
         }
     });
