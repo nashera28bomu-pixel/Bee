@@ -43,6 +43,11 @@ async function launchCymorCore() {
     const sock = makeWASocket({
         version,
 
+        // ✅ Connection Stability Upgrades
+        connectTimeoutMs: 60000,
+        keepAliveIntervalMs: 10000,
+        defaultQueryTimeoutMs: 60000,
+
         auth: {
             creds: state.creds,
 
@@ -55,15 +60,11 @@ async function launchCymorCore() {
 
         logger: pino({ level: 'silent' }),
 
-        // ✅ MUCH MORE STABLE
+        // ✅ Stable Browser Signature
         browser: Browsers.ubuntu('Chrome'),
 
-        // ✅ Better connection handling
         syncFullHistory: false,
         markOnlineOnConnect: false,
-
-        // ✅ Prevent handshake timeout
-        defaultQueryTimeoutMs: 60000,
 
         printQRInTerminal: false,
     });
@@ -71,49 +72,56 @@ async function launchCymorCore() {
     sock.ev.on('creds.update', saveCreds);
 
     // ─────────────────────────────────────
-    // 🔑 NEW STABLE PAIRING SYSTEM
+    // 🔑 STABLE PAIRING SYSTEM
     // ─────────────────────────────────────
     sock.ev.on('connection.update', async (update) => {
 
         const { connection, lastDisconnect } = update;
 
-        // ✅ Request pairing code immediately
+        // ✅ Request Pairing Code
         if (
             connection === 'connecting' &&
             !sock.authState.creds.registered
         ) {
 
-            try {
+            // ✅ Give WhatsApp time to initialize handshake
+            setTimeout(async () => {
 
-                const phoneNumber = process.env.BOT_PHONE_NUMBER;
+                try {
 
-                console.log('📲 Requesting Pairing Code...');
+                    const phoneNumber = process.env.BOT_PHONE_NUMBER;
 
-                let code = await sock.requestPairingCode(phoneNumber);
+                    console.log('📲 Requesting Pairing Code...');
 
-                code = code?.match(/.{1,4}/g)?.join("-") || code;
+                    let code = await sock.requestPairingCode(phoneNumber);
 
-                console.log('\n');
-                console.log('╔══════════════════════════════════╗');
-                console.log('║      CYMOR PAIRING CODE         ║');
-                console.log('╠══════════════════════════════════╣');
-                console.log(`║       ${code}       ║`);
-                console.log('╚══════════════════════════════════╝');
-                console.log('\n');
+                    code = code?.match(/.{1,4}/g)?.join("-") || code;
 
-            } catch (err) {
+                    console.log('\n');
+                    console.log('╔══════════════════════════════════╗');
+                    console.log('║      CYMOR PAIRING CODE         ║');
+                    console.log('╠══════════════════════════════════╣');
+                    console.log(`║       ${code}       ║`);
+                    console.log('╚══════════════════════════════════╝');
+                    console.log('\n');
 
-                console.error('❌ Pairing Error:', err);
+                } catch (err) {
 
-            }
+                    console.error('❌ Pairing Error:', err);
+
+                }
+
+            }, 5000);
         }
 
+        // ✅ Connected
         if (connection === 'open') {
 
             console.log('🚀 CYMOR IS ONLINE!');
 
         }
 
+        // ✅ Reconnect Logic
         if (connection === 'close') {
 
             const reconnect =
@@ -279,13 +287,13 @@ async function launchCymorCore() {
 
             const menu = `
 ╔═══════════════════════════╗
-         *CYMOR EXECUTIVE ASSISTANT*
+         *CYMOR EXECUTIVE CORE*
 ╚═══════════════════════════╝
 
 Hi *${pushName}*! 👋 
 
 Thanks for contacting Cymor! He is currently *offline* ${currentActivity}.
-You can request for music audio using !play,browse below options or come back later.
+Browse the options below or come back later
 ✨ ══════════════════════════ ✨
    *💬 [1]* Chat with CymorAI
    *💼 [2]* Business Request
