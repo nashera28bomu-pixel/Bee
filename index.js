@@ -44,26 +44,46 @@ async function launchCymorCore() {
 
     sock.ev.on('creds.update', saveCreds);
 
-    // ─── 🔑 PAIRING CODE ENGINE ───
-    let pairingRequested = false;
+    // ─── 🔑 SMART PAIRING ENGINE (WITH AUTO-RETRY) ───
+    let pairingTimeout;
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
-        if (qr && !sock.authState.creds.registered && !pairingRequested) {
-            pairingRequested = true;
+
+        if (qr && !sock.authState.creds.registered) {
             const botPhoneNumber = process.env.BOT_PHONE_NUMBER;
-            if (botPhoneNumber) {
-                setTimeout(async () => {
-                    try {
-                        let code = await sock.requestPairingCode(botPhoneNumber);
-                        code = code?.match(/.{1,4}/g)?.join("-") || code;
-                        console.log(`\n╔══════════════════════════════════════════╗\n║   💎 CYMOR BOT PAIRING CODE GENERATED    ║\n╠══════════════════════════════════════════╣\n║          👉  ${code}  👈          ║\n╚══════════════════════════════════════════╝\n`);
-                    } catch (err) { pairingRequested = false; }
-                }, 3000);
-            }
+            
+            const requestNewCode = async () => {
+                if (sock.authState.creds.registered) return;
+                try {
+                    console.log(`📡 Generating fresh pairing code for ${botPhoneNumber}...`);
+                    let code = await sock.requestPairingCode(botPhoneNumber);
+                    code = code?.match(/.{1,4}/g)?.join("-") || code;
+                    console.log(`\n╔══════════════════════════════════════════╗`);
+                    console.log(`║   💎 CYMOR BOT PAIRING CODE GENERATED    ║`);
+                    console.log(`╠══════════════════════════════════════════╣`);
+                    console.log(`║          👉  ${code}  👈          ║`);
+                    console.log(`╚══════════════════════════════════════════╝\n`);
+                    
+                    // If not paired in 110 seconds, trigger another code request
+                    clearTimeout(pairingTimeout);
+                    pairingTimeout = setTimeout(requestNewCode, 110000); 
+                } catch (err) {
+                    console.error("❌ Pairing Code Request Failed, retrying in 10s...");
+                    setTimeout(requestNewCode, 10000);
+                }
+            };
+
+            if (!pairingTimeout) await requestNewCode();
         }
-        if (connection === 'open') console.log('🚀 Cymor Assistant: Online');
+
+        if (connection === 'open') {
+            console.log('🚀 Cymor Assistant: Online and Connected!');
+            clearTimeout(pairingTimeout);
+        }
+
         if (connection === 'close') {
-            const reconnect = (lastDisconnect.error instanceof Boom) ? lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut : true;
+            const reconnect = (lastDisconnect.error instanceof Boom) ? 
+                lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut : true;
             if (reconnect) launchCymorCore();
         }
     });
@@ -104,15 +124,20 @@ async function launchCymorCore() {
 
         // 🤖 AI Chat State
         if (clientStates[from] === 'IN_GEMINI_CHAT') {
-            if (lowerBody === 'exit') { clientStates[from] = null; return await sock.sendMessage(from, { text: "🤖 AI Session Ended. Have a lovely day!" }); }
+            if (lowerBody === 'exit') { 
+                clientStates[from] = null; 
+                return await sock.sendMessage(from, { text: "🤖 AI Session Ended. Have a lovely day!" }); 
+            }
             const res = await aiModel.generateContent(body);
             const aiReply = res.response.text();
-            return await sock.sendMessage(from, { text: `${aiReply}\n\n_I will ensure Cymor sees your message once he is back._\n\n*Type exit to return to Menu.*` }, { quoted: msg });
+            return await sock.sendMessage(from, { 
+                text: `${aiReply}\n\n_I will ensure Cymor sees your message once he is back._\n\n*Type exit to return to Menu.*` 
+            }, { quoted: msg });
         }
 
         // 🎛️ Menu Logic Options
         if (body === '1') { clientStates[from] = 'IN_GEMINI_CHAT'; return await sock.sendMessage(from, { text: "🤖 *CymorAI Activated.*\nHow can I help you today? I'll make sure Simion sees this later." }); }
-        if (body === '2') return await sock.sendMessage(from, { text: "💼 *Business Portal*\nPlease describe your project needs. Simion will see this and get back to you. Have a lovely day!" });
+        if (body === '2') return await sock.sendMessage(from, { text: "💼 *Business Portal*\nPlease describe your project needs in detail. Simion will see this and get back to you. Have a lovely day!" });
         if (body === '3') return await sock.sendMessage(from, { text: "🎵 *Music Jukebox*\nSend `!play [Song Name]` to enjoy some music while you wait for Cymor!" });
         if (body === '4') return await sock.sendMessage(from, { text: "✨ *Brand Portfolio*\nBrowse our services: Site Dev, Bot creation, and Premium Edits. Have a lovely day!" });
         if (body === '5') return await sock.sendMessage(from, { text: "🎮 *eFootball Challenge*\nDrop your squad name! Cymor (3137 strength) will check this soon. Have a lovely day!" });
@@ -128,7 +153,7 @@ async function launchCymorCore() {
             const currentActivity = config.activities[Math.floor(Math.random() * config.activities.length)];
             const menu = `
 ╔═══════════════════════════╗
-         *CYMOR EXECUTIVE CORE*
+         *CYMOR EXECUTIVE ASSISTANT*
 ╚═══════════════════════════╝
 
 Hi *${pushName}*! 👋 
