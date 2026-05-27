@@ -4,7 +4,8 @@ const {
     useMultiFileAuthState, 
     DisconnectReason, 
     fetchLatestBaileysVersion,
-    Browsers // Added to ensure standard browser strings
+    Browsers,
+    makeCacheableSignalKeyStore // Added for faster/stable handshakes
 } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
@@ -12,7 +13,6 @@ const axios = require('axios');
 const http = require('http');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const config = require('./config');
-const fs = require('fs');
 
 // ─── 🌐 RENDER PORT BINDING ───
 const port = process.env.PORT || 3000;
@@ -21,7 +21,6 @@ http.createServer((req, res) => {
   res.end('Cymor Executive Core: Active\n');
 }).listen(port);
 
-// Initialize Gemini
 const genAI = new GoogleGenerativeAI(config.geminiApiKey);
 const aiModel = genAI.getGenerativeModel({ 
     model: "gemini-2.5-flash-lite", 
@@ -30,67 +29,56 @@ const aiModel = genAI.getGenerativeModel({
 
 let isBotActive = true;
 const clientStates = {};
-const pendingNotifications = new Set();
 
 async function launchCymorCore() {
-    // 🛡️ SESSION CLEANER: Removes incomplete creds if pairing failed previously
-    if (!fs.existsSync('./cymor_auth_session/creds.json')) {
-        console.log("🧹 Initializing clean session...");
-    }
-
     const { state, saveCreds } = await useMultiFileAuthState('cymor_auth_session');
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
         version,
-        auth: state,
+        auth: {
+            creds: state.creds,
+            // 🛡️ Enhanced Key Store for better pairing recognition
+            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
+        },
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        // 🔄 FIXED BROWSER STRING: Essential for "Real" pairing codes
-        browser: Browsers.ubuntu('Chrome') 
+        // 🔄 Use a very specific, stable Browser string
+        browser: Browsers.macOS('Desktop'),
+        syncFullHistory: false,
+        markOnlineOnConnect: true,
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    // ─── 🔑 RE-OPTIMIZED PAIRING ENGINE ───
-    let pairingTimeout;
+    // ─── 🔑 RE-ENGINEERED PAIRING TRIGGER ───
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
+        // Only request a code if we have a QR signal and are NOT registered
         if (qr && !sock.authState.creds.registered) {
             const botPhoneNumber = process.env.BOT_PHONE_NUMBER;
             
-            const requestNewCode = async () => {
-                if (sock.authState.creds.registered) return;
+            // Wait 10 seconds for the Render network to "warm up" before requesting
+            setTimeout(async () => {
                 try {
-                    // Give the socket a moment to stabilize
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                    
-                    console.log(`📡 Requesting Official Pairing Code for ${botPhoneNumber}...`);
+                    console.log(`📡 FORCING STABLE CODE FOR: ${botPhoneNumber}`);
                     let code = await sock.requestPairingCode(botPhoneNumber);
                     code = code?.match(/.{1,4}/g)?.join("-") || code;
                     
                     console.log(`\n╔══════════════════════════════════════════╗`);
-                    console.log(`║   💎 CYMOR BOT PAIRING CODE GENERATED    ║`);
+                    console.log(`║   ⚡ OFFICIAL STABLE PAIRING CODE       ║`);
                     console.log(`╠══════════════════════════════════════════╣`);
                     console.log(`║          👉  ${code}  👈          ║`);
                     console.log(`╚══════════════════════════════════════════╝\n`);
-                    
-                    // Refresh code every 2 minutes if not paired
-                    clearTimeout(pairingTimeout);
-                    pairingTimeout = setTimeout(requestNewCode, 120000); 
                 } catch (err) {
-                    console.error("❌ Pairing Request Fault. Retrying...");
-                    setTimeout(requestNewCode, 10000);
+                    console.error("❌ Handshake Error. If this repeats, restart Render.");
                 }
-            };
-
-            if (!pairingTimeout) await requestNewCode();
+            }, 10000); 
         }
 
         if (connection === 'open') {
-            console.log('🚀 Cymor Assistant: Online and Fully Linked!');
-            clearTimeout(pairingTimeout);
+            console.log('🚀 CYMOR IS ONLINE!');
         }
 
         if (connection === 'close') {
@@ -100,7 +88,7 @@ async function launchCymorCore() {
         }
     });
 
-    // ─── 💬 MESSAGE HANDLING ───
+    // ─── 💬 CORE MESSAGE HANDLER ───
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
@@ -117,7 +105,7 @@ async function launchCymorCore() {
 
         if (!isBotActive) return;
 
-        // !play command
+        // Jukebox logic
         if (lowerBody.startsWith('!play ')) {
             const query = body.substring(6).trim();
             await sock.sendMessage(from, { text: `⚡ _Fetching: "${query}"..._` }, { quoted: msg });
@@ -134,27 +122,22 @@ async function launchCymorCore() {
             } catch (e) { return await sock.sendMessage(from, { text: "❌ Jukebox Error." }); }
         }
 
-        // Gemini AI Chat
+        // AI Chat logic
         if (clientStates[from] === 'IN_GEMINI_CHAT') {
-            if (lowerBody === 'exit') { clientStates[from] = null; return await sock.sendMessage(from, { text: "🤖 AI Session Ended. Have a lovely day!" }); }
+            if (lowerBody === 'exit') { clientStates[from] = null; return await sock.sendMessage(from, { text: "🤖 Session Ended. Have a lovely day!" }); }
             const res = await aiModel.generateContent(body);
-            return await sock.sendMessage(from, { text: `${res.response.text()}\n\n_I will ensure Cymor sees your message._\n\n*Type exit to return to Menu.*` }, { quoted: msg });
+            return await sock.sendMessage(from, { text: `${res.response.text()}\n\n*Type exit to return to Menu.*` }, { quoted: msg });
         }
 
-        // Menu Selections
-        if (body === '1') { clientStates[from] = 'IN_GEMINI_CHAT'; return await sock.sendMessage(from, { text: "🤖 *CymorAI Activated.*\nHow can I help you today?" }); }
-        if (body === '2') return await sock.sendMessage(from, { text: "💼 *Business Portal*\nDescribe your project. Have a lovely day!" });
-        if (body === '3') return await sock.sendMessage(from, { text: "🎵 *Music Jukebox*\nSend `!play [Song Name]` to enjoy some music!" });
-        if (body === '4') return await sock.sendMessage(from, { text: "✨ *Brand Portfolio*\nSite Dev | Bots | Premium Edits. Have a lovely day!" });
-        if (body === '5') return await sock.sendMessage(from, { text: "🎮 *eFootball Challenge*\nDrop your squad name. Cymor will check this soon!" });
-        if (body === '6') { 
-            pendingNotifications.add(from);
-            await sock.sendMessage(config.ownerNumber, { text: `🚨 Lead: ${pushName} (${from})` });
-            return await sock.sendMessage(from, { text: "✨ Notification Sent! Have a lovely day!" });
+        // Menu selections
+        const options = {'1': 'IN_GEMINI_CHAT', '2': 'Business', '3': 'Music', '4': 'Portfolio', '5': 'eFootball', '6': 'Bot'};
+        if (options[body]) {
+            if (body === '1') { clientStates[from] = 'IN_GEMINI_CHAT'; return await sock.sendMessage(from, { text: "🤖 AI Activated. How can I help?" }); }
+            return await sock.sendMessage(from, { text: `✨ Option ${body} selected. Have a lovely day!` });
         }
 
         // Greeting & Menu
-        const greets = ["hi", "hello", "sasa", "niaje", "hey"];
+        const greets = ["hi", "hello", "sasa", "niaje"];
         if (greets.some(g => lowerBody.includes(g))) {
             const currentActivity = config.activities[Math.floor(Math.random() * config.activities.length)];
             const menu = `
