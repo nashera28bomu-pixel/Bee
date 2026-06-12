@@ -1,58 +1,83 @@
 const config = require('./config');
 
 /**
- * Custom Utility Helpers for Cymor Executive Core
+ * Cymor Executive Core - Utility Helpers
+ * Clean, scalable helper system for bot operations
  */
+
 module.exports = {
-    
-    /**
-     * Dynamic Activity Picker
-     * Pulls a random status phrase from the config matrix to display on user welcome.
-     * @returns {string} A randomly selected activity statement.
-     */
+
+    // ─────────────────────────────────────
+    // 🎯 RANDOM ACTIVITY PICKER
+    // ─────────────────────────────────────
     getRandomActivity: () => {
         const activities = config.activities;
-        if (!activities || activities.length === 0) {
-            return "engineering advanced automation codes 💻";
+
+        if (!Array.isArray(activities) || activities.length === 0) {
+            return "optimizing intelligent automation systems 💻";
         }
-        return activities[Math.floor(Math.random() * activities.length)];
+
+        const index = Math.floor(Math.random() * activities.length);
+        return activities[index];
     },
 
-    /**
-     * Session Cache Cleaner
-     * Automatically purges handled users from the memory tracking sets after a set duration 
-     * (e.g., 6 hours) so returning users can receive the greetings layout again later.
-     * @param {Set} handledUsersSet - The cache set tracking greeted contacts.
-     * @param {object} userStatesObj - The state tracking database object.
-     */
+
+    // ─────────────────────────────────────
+    // 🧹 SMART SESSION CLEANER (SAFE VERSION)
+    // ─────────────────────────────────────
     initializeAutoPurge: (handledUsersSet, userStatesObj) => {
-        const SIX_HOURS = 1000 * 60 * 60 * 6;
+
+        const TWO_HOURS = 1000 * 60 * 60 * 2;
+
         setInterval(() => {
-            handledUsersSet.clear();
-            // Clear keys in userStates that aren't locked in an active session
+
+            // Clear temporary "greeted users" cache
+            if (handledUsersSet && typeof handledUsersSet.clear === "function") {
+                handledUsersSet.clear();
+            }
+
+            // Clean only inactive or empty states (safer than full wipe)
             for (const jid in userStatesObj) {
-                if (!userStatesObj[jid]) {
+
+                const state = userStatesObj[jid];
+
+                // Remove only invalid or null states
+                if (!state || state === null || state === undefined) {
+                    delete userStatesObj[jid];
+                }
+
+                // Optional: remove explicitly expired sessions
+                if (state?.expiresAt && Date.now() > state.expiresAt) {
                     delete userStatesObj[jid];
                 }
             }
-            console.log("🧹 [System Maintenance]: Temporary user interaction caches cleared successfully.");
-        }, SIX_HOURS);
+
+            console.log("🧹 Cymor Core: Session cache optimized successfully.");
+
+        }, TWO_HOURS);
     },
 
-    /**
-     * eFootball Invitation Formatter
-     * Returns a structured layout confirming the game challenge criteria.
-     * @param {string} userName - The name of the challenger.
-     * @param {string} userSquadName - The team name provided by the challenger.
-     * @returns {string} High-contrast textual notification.
-     */
+
+    // ─────────────────────────────────────
+    // 🎮 EFOOTBALL MATCH FORMATTER
+    // ─────────────────────────────────────
     formatMatchChallenge: (userName, userSquadName) => {
-        return `✨ ──────────────── ✨\n` +
-               `       *ARENA INVITE ACKNOWLEDGED* \n` +
-               `✨ ──────────────── ✨\n\n` +
-               `⚔️ *Challenger:* ${userName}\n` +
-               `🛡️ *Target Squad:* ${userSquadName}\n` +
-               `⚡ *Opponent:* ${config.alias} (Squad Strength: ${config.personalInfo.eFootball.squadStrength})\n\n` +
-               `Match validation is logged. Simion will ping you with a co-op room code or friendly request code when he initiates his eFootball terminal! 🔥`;
+
+        const squadStrength = config?.personalInfo?.eFootball?.squadStrength || "Unknown";
+
+        return `
+⚔️ ═══════════════════ ⚔️
+   ARENA CHALLENGE RECEIVED
+⚔️ ═══════════════════ ⚔️
+
+👤 Challenger: ${userName}
+🛡️ Squad Name: ${userSquadName}
+⚡ Cymor Squad Strength: ${squadStrength}
+
+📌 Status: Match request logged successfully.
+🎮 Note: Owner will respond when available.
+
+🔥 Prepare for battle in the arena!
+        `.trim();
     }
 };
