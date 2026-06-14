@@ -96,8 +96,15 @@ function getMemory(user) {
 // 🚀 MAIN BOT
 // ─────────────────────────────────────
 let memoryLoaded = false;
+let isLaunching = false;
 
 async function launchCymorCore() {
+
+    if (isLaunching) {
+        console.log('⏳ Launch already in progress, skipping duplicate call.');
+        return;
+    }
+    isLaunching = true;
 
     if (!memoryLoaded) {
         loadMemory();
@@ -151,9 +158,12 @@ async function launchCymorCore() {
 
         if (connection === 'open') {
             console.log('🚀 Cymor Assistant Online');
+            isLaunching = false;
         }
 
         if (connection === 'close') {
+            isLaunching = false;
+
             const statusCode = lastDisconnect?.error instanceof Boom
                 ? lastDisconnect.error.output.statusCode
                 : null;
@@ -163,7 +173,7 @@ async function launchCymorCore() {
             console.log(`🔌 Connection closed (code: ${statusCode || 'unknown'}). Reconnecting: ${shouldReconnect}`);
 
             if (shouldReconnect) {
-                setTimeout(() => launchCymorCore(), 3000);
+                setTimeout(() => launchCymorCore(), 5000);
             } else {
                 console.log('🚪 Logged out. Delete cymor_auth_session folder and restart to re-pair.');
             }
