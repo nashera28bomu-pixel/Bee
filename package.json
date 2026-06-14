@@ -1,7 +1,7 @@
 {
   "name": "cymor-executive-assistant",
   "version": "1.1.0",
-  "description": "Premium WhatsApp Assistant for Legendary Smiley Cymor with Gemini AI & Music Integration",
+  "description": "Premium WhatsApp Assistant for Legendary Smiley Cymor with Gemini AI",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
