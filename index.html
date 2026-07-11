@@ -477,20 +477,42 @@ document.getElementById('playerClose').addEventListener('click', () => {
   playerOverlay.classList.remove('open');
 });
 
+const MAX_STREAM_ATTEMPTS = 4;
+const RETRY_DELAY_MS = 1200;
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function fetchStreamWithRetry(subjectId, detailPath, se, ep){
+  let lastData = null;
+  for(let attempt = 1; attempt <= MAX_STREAM_ATTEMPTS; attempt++){
+    playStatus.textContent = attempt === 1
+      ? "Resolving stream…"
+      : `Retrying (mirror ${attempt}/${MAX_STREAM_ATTEMPTS})…`;
+    try{
+      const res = await fetch(
+        `${API_BASE}/api/stream/${subjectId}?detail_path=${encodeURIComponent(detailPath)}&se=${se}&ep=${ep}`
+      );
+      const data = await res.json();
+      lastData = data;
+      const hasPlayableUrl = data.has_resource && (data.sources || []).some(s => s.url);
+      if(hasPlayableUrl) return data;
+    }catch(e){
+      lastData = null;
+    }
+    if(attempt < MAX_STREAM_ATTEMPTS) await sleep(RETRY_DELAY_MS);
+  }
+  return lastData; // return whatever we last got so caller can show the real reason
+}
+
 async function playCurrent(){
   if(!currentSubject?.subjectId){ playStatus.textContent = "Missing subject info."; return; }
   const se = seInput.value || 1;
   const ep = epInput.value || 1;
-  playStatus.textContent = "Resolving stream…";
 
   try{
-    const streamRes = await fetch(
-      `${API_BASE}/api/stream/${currentSubject.subjectId}?detail_path=${encodeURIComponent(currentSubject.detailPath)}&se=${se}&ep=${ep}`
-    );
-    const streamData = await streamRes.json();
+    const streamData = await fetchStreamWithRetry(currentSubject.subjectId, currentSubject.detailPath, se, ep);
 
-    if(!streamData.has_resource){
-      playStatus.textContent = streamData.note || "No stream found for this episode.";
+    if(!streamData){
+      playStatus.textContent = "Stream resolution failed. Try again.";
       return;
     }
 
@@ -500,7 +522,9 @@ async function playCurrent(){
       .sort((a, b) => parseInt(b.resolution) - parseInt(a.resolution));
 
     if(!playable.length){
-      playStatus.textContent = "Only unsupported formats are available for this title right now.";
+      playStatus.textContent = streamData.has_resource
+        ? "Only unsupported formats are available for this title right now."
+        : (streamData.note || "No stream found after several attempts — this episode may not be hosted yet.");
       return;
     }
 
