@@ -529,7 +529,7 @@ async function playCurrent(){
     }
 
     const best = playable[0];
-    videoEl.src = best.url;
+    videoEl.src = `${API_BASE}/proxy?url=${encodeURIComponent(best.url)}`;
     qualityPill.textContent = best.resolution;
     playerOverlay.classList.add('open');
     playStatus.textContent = "";
@@ -544,7 +544,7 @@ async function playCurrent(){
           track.kind = 'subtitles';
           track.label = cap.lanName || cap.language || `Track ${i+1}`;
           track.srclang = cap.lanCode || cap.language || 'en';
-          track.src = cap.url;
+          track.src = `${API_BASE}/proxy?url=${encodeURIComponent(cap.url)}`;
           if(i === 0) track.default = true;
           videoEl.appendChild(track);
         });
