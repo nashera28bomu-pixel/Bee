@@ -1,0 +1,78 @@
+name: Extract Zip to Root
+
+# Trigger manually from the GitHub Actions tab (mobile-friendly: no PC needed).
+# Just upload any zip file to the repo root via GitHub's web "Add file" -> "Upload files",
+# then run this workflow. It auto-detects every .zip file in the root and extracts it.
+on:
+  workflow_dispatch:
+    inputs:
+      delete_zip_after:
+        description: "Delete the zip file(s) after extracting?"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Find zip files in root
+        id: findzips
+        run: |
+          shopt -s nullglob
+          zips=(*.zip)
+          if [ "${#zips[@]}" -eq 0 ]; then
+            echo "::error::No .zip file found in repo root. Upload one first."
+            exit 1
+          fi
+          echo "Found zip(s): ${zips[*]}"
+          printf '%s\n' "${zips[@]}" > /tmp/zip_list.txt
+
+      - name: Extract each zip and flatten
+        run: |
+          shopt -s dotglob
+          while IFS= read -r zipfile; do
+            echo "== Extracting: $zipfile =="
+            staging="__extracted__"
+            rm -rf "$staging"
+            mkdir -p "$staging"
+            unzip -o "$zipfile" -d "$staging"
+
+            pushd "$staging" > /dev/null
+            entries=(*)
+            if [ "${#entries[@]}" -eq 1 ] && [ -d "${entries[0]}" ]; then
+              echo "Flattening top-level folder: ${entries[0]}"
+              mv "${entries[0]}"/* ../ 2>/dev/null || true
+              mv "${entries[0]}"/.[!.]* ../ 2>/dev/null || true
+            else
+              mv * ../ 2>/dev/null || true
+              mv .[!.]* ../ 2>/dev/null || true
+            fi
+            popd > /dev/null
+            rm -rf "$staging"
+
+            if [ "${{ github.event.inputs.delete_zip_after }}" = "true" ]; then
+              rm -f "$zipfile"
+            fi
+          done < /tmp/zip_list.txt
+
+      - name: Commit and push extracted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "chore: extract uploaded zip(s) to repo root"
+            git push
+          fi
