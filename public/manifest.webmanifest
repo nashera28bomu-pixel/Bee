@@ -1,0 +1,17 @@
+{
+  "name": "Cymor Movie Hub",
+  "short_name": "Cymor",
+  "description": "A cinematic archive for discovering stories worth staying up for.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090b18",
+  "theme_color": "#eea939",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
